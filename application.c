@@ -53,6 +53,15 @@
 #include "console_task.h"
 #include "task_message.h"
 
+
+#define APPLICATION_CLOCK_SOURCE    AM_HAL_CTIMER_LFRC_32HZ
+#define APPLICATION_TIMER_PERIOD    32
+#define APPLICATION_TIMER_SOURCE	AM_HAL_CTIMER_TIMERA
+#define APPLICATION_TIMER_INT		AM_HAL_CTIMER_INT_TIMERA0
+
+static uint32_t gui32ApplicationTimerPeriod = 10;
+static uint32_t gui32Counter = 0;
+
 typedef enum { JOIN = 0, SEND } application_command_e;
 
 TaskHandle_t application_task_handle;
@@ -65,6 +74,7 @@ const CLI_Command_Definition_t prvApplicationCommandDefinition = {
     prvApplicationCommand, -1};
 
 static QueueHandle_t ApplicationTaskQueue;
+
 
 #define LM_APPLICATION_PORT 1
 #define LM_BUFFER_SIZE 242
@@ -193,6 +203,51 @@ void application_handle_command()
     }
 }
 
+void application_timer_isr()
+{
+	portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+	task_message_t TaskMessage;
+
+	am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
+
+
+	sprintf(psLmDataBuffer, "%d", gui32Counter);
+
+    LmAppData.Port = LM_APPLICATION_PORT;
+    LmAppData.BufferSize = strlen(psLmDataBuffer);
+    LmAppData.Buffer = psLmDataBuffer;
+    gui32Counter++;
+
+	TaskMessage.ui32Event = SEND;
+    TaskMessage.psContent = &LmAppData;
+
+	xQueueSendFromISR(ApplicationTaskQueue, &TaskMessage, &xHigherPriorityTaskWoken);
+
+	portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
+}
+
+void application_timer_setup()
+{
+	am_hal_ctimer_config_t ApplicationTimer =
+	{
+		0,
+		(AM_HAL_CTIMER_FN_REPEAT |
+		AM_HAL_CTIMER_INT_ENABLE |
+		APPLICATION_CLOCK_SOURCE),
+		0,
+	};
+
+	am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_LFRC_START, 0);
+	am_hal_ctimer_clear(0, APPLICATION_TIMER_SOURCE);
+	am_hal_ctimer_config(0, &ApplicationTimer);
+
+	am_hal_ctimer_int_register(APPLICATION_TIMER_INT, application_timer_isr);
+	am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
+	NVIC_SetPriority(CTIMER_IRQn, NVIC_configKERNEL_INTERRUPT_PRIORITY);
+	am_hal_ctimer_int_enable(APPLICATION_TIMER_INT);
+	NVIC_EnableIRQ(CTIMER_IRQn);
+}
+
 void application_setup()
 {
     BoardInitMcu();
@@ -244,6 +299,8 @@ void application_task(void *pvParameters)
     nm_console_print_prompt();
 
     application_setup();
+    application_timer_setup();
+
     TransmitPending = false;
     while (1) {
         application_handle_command();
@@ -275,6 +332,7 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer, "Supported commands are:\r\n");
         strcat(pcWriteBuffer, "  join\r\n");
         strcat(pcWriteBuffer, "  send\r\n");
+        strcat(pcWriteBuffer, "  periodic\r\n");
         strcat(pcWriteBuffer, "\r\n");
         strcat(
             pcWriteBuffer,
@@ -290,7 +348,14 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer,
                "  ack   request message confirmation from the server\r\n");
         strcat(pcWriteBuffer, "  msg   payload content\r\n");
-    }
+	} else if (strncmp(pcParameterString, "periodic", 8) == 0) {
+		strcat(pcWriteBuffer, "usage: lorawan periodic [start <period>|stop]\r\n");
+		strcat(pcWriteBuffer, "\r\n");
+		strcat(pcWriteBuffer, "Where:\r\n");
+		strcat(pcWriteBuffer, "  start   to begin transmitting periodically\r\n");
+		strcat(pcWriteBuffer, "  stop    to stop transmitting\r\n");
+		strcat(pcWriteBuffer, "  period  defines how often to transmit in seconds (default is 10s)\r\n");
+	}
 }
 
 void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
@@ -335,6 +400,39 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
 }
 
+void prvApplicationPeriodicSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
+                                  const char *pcCommandString)
+{
+    const char *pcParameterString;
+    portBASE_TYPE xParameterStringLength;
+
+    pcParameterString =
+        FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
+    if (pcParameterString == NULL) {
+        return;
+    }
+
+    if (strncmp(pcParameterString, "start", xParameterStringLength) == 0) {
+
+        pcParameterString =
+            FreeRTOS_CLIGetParameter(pcCommandString, 3, &xParameterStringLength);
+        if (pcParameterString == NULL) {
+        	gui32ApplicationTimerPeriod = 5;
+        }
+        else
+        {
+        	gui32ApplicationTimerPeriod = atoi(pcParameterString);
+        }
+
+    	uint32_t ui32Period = gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
+		am_hal_ctimer_period_set(0, APPLICATION_TIMER_SOURCE, ui32Period, (ui32Period >> 1));
+		am_hal_ctimer_start(0, APPLICATION_TIMER_SOURCE);
+    }
+    else if (strncmp(pcParameterString, "stop", xParameterStringLength) == 0) {
+    	am_hal_ctimer_stop(0, APPLICATION_TIMER_SOURCE);
+    }
+}
+
 portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                                     const char *pcCommandString)
 {
@@ -361,6 +459,9 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                0) {
         prvApplicationSendSubCommand(pcWriteBuffer, xWriteBufferLen,
                                      pcCommandString);
+    } else if (strncmp(pcParameterString, "periodic", xParameterStringLength) == 0) {
+    	prvApplicationPeriodicSubCommand(pcWriteBuffer, xWriteBufferLen,
+                pcCommandString);
     }
 
     return pdFALSE;
