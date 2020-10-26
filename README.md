@@ -1,6 +1,19 @@
 # LoRaWAN Application Framework Sample
 
-This is a LoRaWAN Application Framework sample.
+This is an example LoRaWAN Application Framework.  There are three keys required for
+over the air activiation:
+* Device EUI
+* Application EUI
+* Application Key
+
+To join a LoRaWAN network, modify the following defines and keys listed in the file `se-identity.h`:
+
+* Assign the Application EUI to `LORAWAN_JOIN_EUI` (line 79)
+* Assign the Application Key to the application root key `APP_KEY` (line 105)
+* Assign the Application Key to the network root key `NWK_KEY` (line 113)
+
+Finally, adjust values in the file `Comissioning.h` to reflect the network that the device will be
+joining to.
 
 # Application Setup
 
