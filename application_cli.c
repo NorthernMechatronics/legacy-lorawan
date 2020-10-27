@@ -77,8 +77,11 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer, "\r\n");
         strcat(pcWriteBuffer, "Supported commands are:\r\n");
         strcat(pcWriteBuffer, "  join\r\n");
+        strcat(pcWriteBuffer, "  reset\r\n");
         strcat(pcWriteBuffer, "  send\r\n");
         strcat(pcWriteBuffer, "  periodic\r\n");
+        strcat(pcWriteBuffer, "  set\r\n");
+        strcat(pcWriteBuffer, "  get\r\n");
         strcat(pcWriteBuffer, "\r\n");
         strcat(
             pcWriteBuffer,
@@ -86,6 +89,9 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     } else if (strncmp(pcParameterString, "join", 4) == 0) {
         strcat(pcWriteBuffer, "usage: lorawan join\r\n");
         strcat(pcWriteBuffer, "Join a LoRaWAN network.\r\n");
+    } else if (strncmp(pcParameterString, "reset", 5) == 0) {
+        strcat(pcWriteBuffer, "usage: lorawan reset\r\n");
+        strcat(pcWriteBuffer, "Stop and reset the LoRaMac stack.\r\n");
     } else if (strncmp(pcParameterString, "send", 3) == 0) {
         strcat(pcWriteBuffer, "usage: lorawan send <port> <ack> [msg]\r\n");
         strcat(pcWriteBuffer, "\r\n");
@@ -94,14 +100,21 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer,
                "  ack   request message confirmation from the server\r\n");
         strcat(pcWriteBuffer, "  msg   payload content\r\n");
-	} else if (strncmp(pcParameterString, "periodic", 8) == 0) {
-		strcat(pcWriteBuffer, "usage: lorawan periodic [start <period>|stop]\r\n");
-		strcat(pcWriteBuffer, "\r\n");
-		strcat(pcWriteBuffer, "Where:\r\n");
-		strcat(pcWriteBuffer, "  start   to begin transmitting periodically\r\n");
-		strcat(pcWriteBuffer, "  stop    to stop transmitting\r\n");
-		strcat(pcWriteBuffer, "  period  defines how often to transmit in seconds (default is 10s)\r\n");
-	}
+    } else if (strncmp(pcParameterString, "periodic", 8) == 0) {
+        strcat(pcWriteBuffer,
+               "usage: lorawan periodic [start <period>|stop]\r\n");
+        strcat(pcWriteBuffer, "\r\n");
+        strcat(pcWriteBuffer, "Where:\r\n");
+        strcat(pcWriteBuffer,
+               "  start   to begin transmitting periodically\r\n");
+        strcat(pcWriteBuffer, "  stop    to stop transmitting\r\n");
+        strcat(pcWriteBuffer, "  period  defines how often to transmit in "
+                              "seconds (default is 10s)\r\n");
+    } else if (strncmp(pcParameterString, "set", 3) == 0) {
+        //TODO
+    } else if (strncmp(pcParameterString, "get", 3) == 0) {
+        //TODO
+    }
 }
 
 void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
@@ -146,8 +159,9 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
 }
 
-void prvApplicationPeriodicSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
-                                  const char *pcCommandString)
+void prvApplicationPeriodicSubCommand(char *pcWriteBuffer,
+                                      size_t xWriteBufferLen,
+                                      const char *pcCommandString)
 {
     const char *pcParameterString;
     portBASE_TYPE xParameterStringLength;
@@ -160,22 +174,22 @@ void prvApplicationPeriodicSubCommand(char *pcWriteBuffer, size_t xWriteBufferLe
 
     if (strncmp(pcParameterString, "start", xParameterStringLength) == 0) {
 
-        pcParameterString =
-            FreeRTOS_CLIGetParameter(pcCommandString, 3, &xParameterStringLength);
+        pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 3,
+                                                     &xParameterStringLength);
         if (pcParameterString == NULL) {
-        	gui32ApplicationTimerPeriod = 5;
-        }
-        else
-        {
-        	gui32ApplicationTimerPeriod = atoi(pcParameterString);
+            gui32ApplicationTimerPeriod = 5;
+        } else {
+            gui32ApplicationTimerPeriod = atoi(pcParameterString);
         }
 
-    	uint32_t ui32Period = gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-		am_hal_ctimer_period_set(0, APPLICATION_TIMER_SOURCE, ui32Period, (ui32Period >> 1));
-		am_hal_ctimer_start(0, APPLICATION_TIMER_SOURCE);
-    }
-    else if (strncmp(pcParameterString, "stop", xParameterStringLength) == 0) {
-    	am_hal_ctimer_stop(0, APPLICATION_TIMER_SOURCE);
+        uint32_t ui32Period =
+            gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
+        am_hal_ctimer_period_set(0, APPLICATION_TIMER_SOURCE, ui32Period,
+                                 (ui32Period >> 1));
+        am_hal_ctimer_start(0, APPLICATION_TIMER_SOURCE);
+    } else if (strncmp(pcParameterString, "stop", xParameterStringLength) ==
+               0) {
+        am_hal_ctimer_stop(0, APPLICATION_TIMER_SOURCE);
     }
 }
 
@@ -201,13 +215,20 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         task_message_t TaskMessage;
         TaskMessage.ui32Event = JOIN;
         xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
+    } else if (strncmp(pcParameterString, "reset", xParameterStringLength) = 0) {
+        LoRaMacStop();
     } else if (strncmp(pcParameterString, "send", xParameterStringLength) ==
                0) {
         prvApplicationSendSubCommand(pcWriteBuffer, xWriteBufferLen,
                                      pcCommandString);
-    } else if (strncmp(pcParameterString, "periodic", xParameterStringLength) == 0) {
-    	prvApplicationPeriodicSubCommand(pcWriteBuffer, xWriteBufferLen,
-                pcCommandString);
+    } else if (strncmp(pcParameterString, "periodic", xParameterStringLength) ==
+               0) {
+        prvApplicationPeriodicSubCommand(pcWriteBuffer, xWriteBufferLen,
+                                         pcCommandString);
+    } else if (strncmp(pcParameterString, "set", xParameterStringLength) = 0) {
+        // TODO
+    } else if (strncmp(pcParameterString, "get", xParameterStringLength) = 0) {
+        // TODO
     }
 
     return pdFALSE;

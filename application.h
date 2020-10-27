@@ -33,17 +33,17 @@
 #define _APPLICATION_H_
 
 #include <FreeRTOS.h>
-#include <queue.h>
 #include <LmHandler.h>
+#include <queue.h>
 
-#define APPLICATION_CLOCK_SOURCE    AM_HAL_CTIMER_LFRC_32HZ
-#define APPLICATION_TIMER_PERIOD    32
-#define APPLICATION_TIMER_SOURCE	AM_HAL_CTIMER_TIMERA
-#define APPLICATION_TIMER_INT		AM_HAL_CTIMER_INT_TIMERA0
+#define APPLICATION_CLOCK_SOURCE AM_HAL_CTIMER_LFRC_32HZ
+#define APPLICATION_TIMER_PERIOD 32
+#define APPLICATION_TIMER_SOURCE AM_HAL_CTIMER_TIMERA
+#define APPLICATION_TIMER_INT AM_HAL_CTIMER_INT_TIMERA0
 
 extern uint32_t gui32ApplicationTimerPeriod;
 
-typedef enum { JOIN = 0, SEND } application_command_e;
+typedef enum { JOIN = 0, RESET, SEND } application_command_e;
 
 extern TaskHandle_t application_task_handle;
 extern QueueHandle_t ApplicationTaskQueue;
