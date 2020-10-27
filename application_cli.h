@@ -29,30 +29,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _APPLICATION_H_
-#define _APPLICATION_H_
+#ifndef _APPLICATION_CLI_H_
+#define _APPLICATION_CLI_H_
 
 #include <FreeRTOS.h>
-#include <queue.h>
-#include <LmHandler.h>
+#include <FreeRTOS_CLI.h>
 
-#define APPLICATION_CLOCK_SOURCE    AM_HAL_CTIMER_LFRC_32HZ
-#define APPLICATION_TIMER_PERIOD    32
-#define APPLICATION_TIMER_SOURCE	AM_HAL_CTIMER_TIMERA
-#define APPLICATION_TIMER_INT		AM_HAL_CTIMER_INT_TIMERA0
+extern CLI_Command_Definition_t ApplicationCommandDefinition;
 
-extern uint32_t gui32ApplicationTimerPeriod;
-
-typedef enum { JOIN = 0, SEND } application_command_e;
-
-extern TaskHandle_t application_task_handle;
-extern QueueHandle_t ApplicationTaskQueue;
-extern void application_task(void *pvParameters);
-
-#define LM_APPLICATION_PORT 1
-#define LM_BUFFER_SIZE 242
-
-extern uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
-extern LmHandlerAppData_t LmAppData;
-
-#endif /* _APPLICATION_H_ */
+#endif /* _APPLICATION_CLI_H_ */

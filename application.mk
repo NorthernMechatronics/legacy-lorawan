@@ -75,3 +75,4 @@ SRC += LmhpFragmentation.c
 SRC += LmhpRemoteMcastSetup.c
 
 SRC += application.c
+SRC += application_cli.c

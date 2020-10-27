@@ -38,10 +38,6 @@
 #include <am_mcu_apollo.h>
 #include <am_util.h>
 
-#include <FreeRTOS.h>
-#include <FreeRTOS_CLI.h>
-#include <queue.h>
-
 #include <LmHandler.h>
 #include <LmHandlerMsgDisplay.h>
 #include <LmhpCompliance.h>
@@ -50,36 +46,19 @@
 #include <timer.h>
 
 #include "application.h"
+#include "application_cli.h"
 #include "console_task.h"
 #include "task_message.h"
 
 
-#define APPLICATION_CLOCK_SOURCE    AM_HAL_CTIMER_LFRC_32HZ
-#define APPLICATION_TIMER_PERIOD    32
-#define APPLICATION_TIMER_SOURCE	AM_HAL_CTIMER_TIMERA
-#define APPLICATION_TIMER_INT		AM_HAL_CTIMER_INT_TIMERA0
-
-static uint32_t gui32ApplicationTimerPeriod = 10;
-static uint32_t gui32Counter = 0;
-
-typedef enum { JOIN = 0, SEND } application_command_e;
+uint32_t gui32ApplicationTimerPeriod;
+static uint32_t gui32Counter;
 
 TaskHandle_t application_task_handle;
-portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
-                                    const char *pcCommandString);
+QueueHandle_t ApplicationTaskQueue;
 
-const CLI_Command_Definition_t prvApplicationCommandDefinition = {
-    (const char *const) "lorawan",
-    (const char *const) "lorawan:\tLoRaWAN Application Framework.\r\n",
-    prvApplicationCommand, -1};
-
-static QueueHandle_t ApplicationTaskQueue;
-
-
-#define LM_APPLICATION_PORT 1
-#define LM_BUFFER_SIZE 242
-static uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
-static LmHandlerAppData_t LmAppData;
+uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
+LmHandlerAppData_t LmAppData;
 
 static LmHandlerParams_t LmParameters;
 static LmHandlerCallbacks_t LmCallbacks;
@@ -291,7 +270,7 @@ void application_setup()
 
 void application_task(void *pvParameters)
 {
-    FreeRTOS_CLIRegisterCommand(&prvApplicationCommandDefinition);
+    FreeRTOS_CLIRegisterCommand(&ApplicationCommandDefinition);
     ApplicationTaskQueue = xQueueCreate(10, sizeof(task_message_t));
 
     am_util_stdio_printf_init(nm_console_print);
@@ -317,152 +296,3 @@ void application_task(void *pvParameters)
     }
 }
 
-void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
-                                  const char *pcCommandString)
-{
-    const char *pcParameterString;
-    portBASE_TYPE xParameterStringLength;
-
-    pcParameterString =
-        FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
-
-    if (pcParameterString == NULL) {
-        strcat(pcWriteBuffer, "usage: lorawan [command] [<args>]\r\n");
-        strcat(pcWriteBuffer, "\r\n");
-        strcat(pcWriteBuffer, "Supported commands are:\r\n");
-        strcat(pcWriteBuffer, "  join\r\n");
-        strcat(pcWriteBuffer, "  send\r\n");
-        strcat(pcWriteBuffer, "  periodic\r\n");
-        strcat(pcWriteBuffer, "\r\n");
-        strcat(
-            pcWriteBuffer,
-            "See 'lorawan help [command] for the details of each command.\r\n");
-    } else if (strncmp(pcParameterString, "join", 4) == 0) {
-        strcat(pcWriteBuffer, "usage: lorawan join\r\n");
-        strcat(pcWriteBuffer, "Join a LoRaWAN network.\r\n");
-    } else if (strncmp(pcParameterString, "send", 3) == 0) {
-        strcat(pcWriteBuffer, "usage: lorawan send <port> <ack> [msg]\r\n");
-        strcat(pcWriteBuffer, "\r\n");
-        strcat(pcWriteBuffer, "Where:\r\n");
-        strcat(pcWriteBuffer, "  port  is the uplink port number\r\n");
-        strcat(pcWriteBuffer,
-               "  ack   request message confirmation from the server\r\n");
-        strcat(pcWriteBuffer, "  msg   payload content\r\n");
-	} else if (strncmp(pcParameterString, "periodic", 8) == 0) {
-		strcat(pcWriteBuffer, "usage: lorawan periodic [start <period>|stop]\r\n");
-		strcat(pcWriteBuffer, "\r\n");
-		strcat(pcWriteBuffer, "Where:\r\n");
-		strcat(pcWriteBuffer, "  start   to begin transmitting periodically\r\n");
-		strcat(pcWriteBuffer, "  stop    to stop transmitting\r\n");
-		strcat(pcWriteBuffer, "  period  defines how often to transmit in seconds (default is 10s)\r\n");
-	}
-}
-
-void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
-                                  const char *pcCommandString)
-{
-    const char *pcParameterString;
-    portBASE_TYPE xParameterStringLength;
-
-    uint8_t port = LM_APPLICATION_PORT;
-    uint8_t argc = FreeRTOS_CLIGetNumberOfParameters(pcCommandString);
-
-    pcParameterString =
-        FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
-    if (argc == 2) {
-        memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
-
-        LmAppData.Port = port;
-        LmAppData.BufferSize = xParameterStringLength;
-        LmAppData.Buffer = psLmDataBuffer;
-    } else {
-        pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 2,
-                                                     &xParameterStringLength);
-        if (pcParameterString == NULL) {
-            strcat(pcWriteBuffer, "error: missing port number\r\n");
-            return;
-        } else {
-            port = atoi(pcParameterString);
-        }
-
-        pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 3,
-                                                     &xParameterStringLength);
-        memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
-
-        LmAppData.Port = port;
-        LmAppData.BufferSize = xParameterStringLength;
-        LmAppData.Buffer = psLmDataBuffer;
-    }
-
-    task_message_t TaskMessage;
-    TaskMessage.ui32Event = SEND;
-    TaskMessage.psContent = &LmAppData;
-    xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
-}
-
-void prvApplicationPeriodicSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
-                                  const char *pcCommandString)
-{
-    const char *pcParameterString;
-    portBASE_TYPE xParameterStringLength;
-
-    pcParameterString =
-        FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
-    if (pcParameterString == NULL) {
-        return;
-    }
-
-    if (strncmp(pcParameterString, "start", xParameterStringLength) == 0) {
-
-        pcParameterString =
-            FreeRTOS_CLIGetParameter(pcCommandString, 3, &xParameterStringLength);
-        if (pcParameterString == NULL) {
-        	gui32ApplicationTimerPeriod = 5;
-        }
-        else
-        {
-        	gui32ApplicationTimerPeriod = atoi(pcParameterString);
-        }
-
-    	uint32_t ui32Period = gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-		am_hal_ctimer_period_set(0, APPLICATION_TIMER_SOURCE, ui32Period, (ui32Period >> 1));
-		am_hal_ctimer_start(0, APPLICATION_TIMER_SOURCE);
-    }
-    else if (strncmp(pcParameterString, "stop", xParameterStringLength) == 0) {
-    	am_hal_ctimer_stop(0, APPLICATION_TIMER_SOURCE);
-    }
-}
-
-portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
-                                    const char *pcCommandString)
-{
-    const char *pcParameterString;
-    portBASE_TYPE xParameterStringLength;
-
-    pcWriteBuffer[0] = 0x0;
-
-    pcParameterString =
-        FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParameterStringLength);
-    if (pcParameterString == NULL) {
-        return pdFALSE;
-    }
-
-    if (strncmp(pcParameterString, "help", xParameterStringLength) == 0) {
-        prvApplicationHelpSubCommand(pcWriteBuffer, xWriteBufferLen,
-                                     pcCommandString);
-    } else if (strncmp(pcParameterString, "join", xParameterStringLength) ==
-               0) {
-        task_message_t TaskMessage;
-        TaskMessage.ui32Event = JOIN;
-        xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
-    } else if (strncmp(pcParameterString, "send", xParameterStringLength) ==
-               0) {
-        prvApplicationSendSubCommand(pcWriteBuffer, xWriteBufferLen,
-                                     pcCommandString);
-    } else if (strncmp(pcParameterString, "periodic", xParameterStringLength) == 0) {
-    	prvApplicationPeriodicSubCommand(pcWriteBuffer, xWriteBufferLen,
-                pcCommandString);
-    }
-
-    return pdFALSE;
-}
