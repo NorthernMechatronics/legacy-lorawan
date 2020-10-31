@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <am_bsp.h>
 #include <am_mcu_apollo.h>
@@ -63,9 +64,51 @@ LmHandlerAppData_t LmAppData;
 static LmHandlerParams_t LmParameters;
 static LmHandlerCallbacks_t LmCallbacks;
 
+static LmhpComplianceParams_t LmComplianceParams;
+
 static bool TransmitPending;
 static bool MacProcessing;
 
+/*
+ * LoRaWAN Certification Test Control Layer Callbacks
+ */
+static void TclOnTxPeriodicityChanged(uint32_t periodicity)
+{
+    am_util_stdio_printf("TCL: Transmit periodicity changed requested\r\n");
+
+    // LoRaWAN Certification Protocol Specification, TS009-1.0.0, Table 8, page 14
+    // Compliance layer will send back periodicity in milliseconds.
+    if (periodicity == 0)
+    {
+    	gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
+    }
+    else
+    {
+    	gui32ApplicationTimerPeriod = periodicity / 1000;
+    }
+
+    uint32_t ui32Period =
+        gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
+    am_hal_ctimer_period_set(0, APPLICATION_TIMER_SOURCE, ui32Period,
+                             (ui32Period >> 1));
+    am_hal_ctimer_start(0, APPLICATION_TIMER_SOURCE);
+
+    nm_console_print_prompt();
+}
+
+static void TclOnTxFrameCtrlChanged(LmHandlerMsgTypes_t isTxConfirmed)
+{
+
+}
+
+static void TclOnPingSlotPeriodicityChanged(uint8_t pingSlotPeriodicity)
+{
+
+}
+
+/*
+ * LoRaMAC Application Layer Callbacks
+ */
 static void OnClassChange(DeviceClass_t deviceClass)
 {
     DisplayClassUpdate(deviceClass);
@@ -86,6 +129,19 @@ static void OnJoinRequest(LmHandlerJoinParams_t *params)
         LmHandlerJoin();
     } else {
         am_util_stdio_printf("LoRaWAN join successful\r\n\r\n");
+
+        psLmDataBuffer[0] = 0;
+        LmAppData.Port = LM_APPLICATION_PORT;
+        LmAppData.BufferSize = 1;
+        LmAppData.Buffer = psLmDataBuffer;
+
+        //FIXME: set a single shot timer to send
+        vTaskDelay(1000);
+
+        task_message_t TaskMessage;
+        TaskMessage.ui32Event = SEND;
+        TaskMessage.psContent = &LmAppData;
+        xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
     }
 
     nm_console_print_prompt();
@@ -193,7 +249,7 @@ void application_timer_isr()
 	sprintf(psLmDataBuffer, "%d", gui32Counter);
 
     LmAppData.Port = LM_APPLICATION_PORT;
-    LmAppData.BufferSize = strlen(psLmDataBuffer);
+    LmAppData.BufferSize = strlen((char *)psLmDataBuffer);
     LmAppData.Buffer = psLmDataBuffer;
     gui32Counter++;
 
@@ -264,8 +320,15 @@ void application_setup()
     LmCallbacks.OnClassChange = OnClassChange;
 
     LmHandlerInit(&LmCallbacks, &LmParameters);
+
+    LmComplianceParams.IsDutFPort224On = true;
+    LmComplianceParams.OnTxPeriodicityChanged = TclOnTxPeriodicityChanged;
+    LmComplianceParams.OnTxFrameCtrlChanged = TclOnTxFrameCtrlChanged;
+    LmComplianceParams.OnPingSlotPeriodicityChanged = TclOnPingSlotPeriodicityChanged;
     LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE,
-                             LmphCompliancePackageFactory());
+                             &LmComplianceParams);
+
+    gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
 }
 
 void application_task(void *pvParameters)

@@ -36,6 +36,8 @@
  */
 #include "se-identity.h"
 
+#define ACTIVE_REGION LORAMAC_REGION_US915
+
 /*!
  * When set to 1 the application uses the Over-the-Air activation procedure
  * When set to 0 the application uses the Personalization activation procedure

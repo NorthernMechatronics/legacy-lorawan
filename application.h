@@ -41,6 +41,8 @@
 #define APPLICATION_TIMER_SOURCE AM_HAL_CTIMER_TIMERA
 #define APPLICATION_TIMER_INT AM_HAL_CTIMER_INT_TIMERA0
 
+#define APPLICATION_TRANSMIT_PERIOD 30
+
 extern uint32_t gui32ApplicationTimerPeriod;
 
 typedef enum { JOIN = 0, RESET, SEND } application_command_e;

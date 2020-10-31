@@ -215,7 +215,7 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         task_message_t TaskMessage;
         TaskMessage.ui32Event = JOIN;
         xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
-    } else if (strncmp(pcParameterString, "reset", xParameterStringLength) = 0) {
+    } else if (strncmp(pcParameterString, "reset", xParameterStringLength) == 0) {
         LoRaMacStop();
     } else if (strncmp(pcParameterString, "send", xParameterStringLength) ==
                0) {
@@ -225,9 +225,9 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                0) {
         prvApplicationPeriodicSubCommand(pcWriteBuffer, xWriteBufferLen,
                                          pcCommandString);
-    } else if (strncmp(pcParameterString, "set", xParameterStringLength) = 0) {
+    } else if (strncmp(pcParameterString, "set", xParameterStringLength) == 0) {
         // TODO
-    } else if (strncmp(pcParameterString, "get", xParameterStringLength) = 0) {
+    } else if (strncmp(pcParameterString, "get", xParameterStringLength) == 0) {
         // TODO
     }
 
