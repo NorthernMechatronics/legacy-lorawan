@@ -42,6 +42,8 @@
 #include <LmHandler.h>
 #include <LmHandlerMsgDisplay.h>
 #include <LmhpCompliance.h>
+#include <LmhpClockSync.h>
+#include <LmhpRemoteMcastSetup.h>
 #include <NvmCtxMgmt.h>
 #include <board.h>
 #include <timer.h>
@@ -66,44 +68,64 @@ static LmHandlerCallbacks_t LmCallbacks;
 
 static LmhpComplianceParams_t LmComplianceParams;
 
-static bool TransmitPending;
-static bool MacProcessing;
+static volatile bool TransmitPending = false;
+static volatile bool MacProcessing = false;
+static volatile bool ClockSynchronized = false;
+static volatile bool McSessionStarted = false;
 
 /*
  * LoRaWAN Certification Test Control Layer Callbacks
  */
 static void TclOnTxPeriodicityChanged(uint32_t periodicity)
 {
+    am_hal_ctimer_stop(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
     am_util_stdio_printf("TCL: Transmit periodicity changed requested\r\n");
 
     // LoRaWAN Certification Protocol Specification, TS009-1.0.0, Table 8, page 14
-    // Compliance layer will send back periodicity in milliseconds.
     if (periodicity == 0)
     {
     	gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
     }
     else
     {
+        // Compliance layer will send back periodicity in milliseconds.
     	gui32ApplicationTimerPeriod = periodicity / 1000;
     }
 
     uint32_t ui32Period =
         gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-    am_hal_ctimer_period_set(0, APPLICATION_TIMER_SOURCE, ui32Period,
+    am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
                              (ui32Period >> 1));
-    am_hal_ctimer_start(0, APPLICATION_TIMER_SOURCE);
+    am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
 
     nm_console_print_prompt();
 }
 
 static void TclOnTxFrameCtrlChanged(LmHandlerMsgTypes_t isTxConfirmed)
 {
-
+	LmParameters.IsTxConfirmed = isTxConfirmed;
 }
 
 static void TclOnPingSlotPeriodicityChanged(uint8_t pingSlotPeriodicity)
 {
+	LmParameters.PingSlotPeriodicity = pingSlotPeriodicity;
+}
 
+static void TclProcessCommand(LmHandlerAppData_t *appData)
+{
+	// Only handle the reset command as that is indicative of the
+	// beginning of compliance testing.  All the other compliance test
+	// commands are handle by the Compliance state machine
+    switch(appData->Buffer[0])
+    {
+    case 0x01:
+		LmComplianceParams.IsDutFPort224On = true;
+        am_util_stdio_printf("Tcl: Device reset requested\r\n");
+    	break;
+    case 0x05:
+        am_util_stdio_printf("Tcl: Duty cycle set to %d\r\n", appData->Buffer[1]);
+        break;
+    }
 }
 
 /*
@@ -112,6 +134,27 @@ static void TclOnPingSlotPeriodicityChanged(uint8_t pingSlotPeriodicity)
 static void OnClassChange(DeviceClass_t deviceClass)
 {
     DisplayClassUpdate(deviceClass);
+    switch (deviceClass)
+    {
+    default:
+    case CLASS_A:
+    {
+    	McSessionStarted = false;
+    }
+    	break;
+    case CLASS_B:
+    {
+    	LmHandlerAppData_t appData = { .Buffer = NULL, .BufferSize = 0, .Port = 0, };
+    	LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
+    	McSessionStarted = true;
+    }
+    	break;
+    case CLASS_C:
+    {
+    	McSessionStarted = true;
+    }
+    	break;
+    }
 }
 
 static void OnMacProcess(void)
@@ -135,8 +178,11 @@ static void OnJoinRequest(LmHandlerJoinParams_t *params)
         LmAppData.BufferSize = 1;
         LmAppData.Buffer = psLmDataBuffer;
 
-        //FIXME: set a single shot timer to send
-        vTaskDelay(1000);
+        uint32_t ui32Period =
+            gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
+        am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
+                                 (ui32Period >> 1));
+        am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
 
         task_message_t TaskMessage;
         TaskMessage.ui32Event = SEND;
@@ -177,6 +223,10 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     nm_console_print_prompt();
 
     switch (appData->Port) {
+    case 0:
+        am_util_stdio_printf("MAC command received\r\n");
+    	break;
+
     case 3:
         if (appData->BufferSize == 1) {
             switch (appData->Buffer[0]) {
@@ -197,7 +247,16 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 
     case LM_APPLICATION_PORT:
         break;
+
+    case 224:
+    	TclProcessCommand(appData);
+    	break;
     }
+}
+
+static void OnSysTimeUpdate( bool isSynchronized, int32_t timeCorrection )
+{
+	ClockSynchronized = isSynchronized;
 }
 
 static void OnTxData(LmHandlerTxParams_t *params)
@@ -209,12 +268,22 @@ static void OnTxData(LmHandlerTxParams_t *params)
 
 void application_handle_uplink()
 {
-    if (TransmitPending) {
-        if (LmHandlerIsBusy() == true) {
-            return;
-        }
-        TransmitPending = false;
-        LmHandlerSend(&LmAppData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
+	if (LmHandlerIsBusy() == true) {
+		return;
+	}
+
+	if (TransmitPending) {
+		TransmitPending = false;
+
+	    LmAppData.Port = LM_APPLICATION_PORT;
+
+	    sprintf(psLmDataBuffer, "%d", gui32Counter);
+	    LmAppData.BufferSize = strlen((char *)psLmDataBuffer);
+	    LmAppData.Buffer = psLmDataBuffer;
+	    gui32Counter++;
+
+		LmHandlerSend(&LmAppData, LmParameters.IsTxConfirmed);
+
     }
 }
 
@@ -245,17 +314,7 @@ void application_timer_isr()
 
 	am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
 
-
-	sprintf(psLmDataBuffer, "%d", gui32Counter);
-
-    LmAppData.Port = LM_APPLICATION_PORT;
-    LmAppData.BufferSize = strlen((char *)psLmDataBuffer);
-    LmAppData.Buffer = psLmDataBuffer;
-    gui32Counter++;
-
 	TaskMessage.ui32Event = SEND;
-    TaskMessage.psContent = &LmAppData;
-
 	xQueueSendFromISR(ApplicationTaskQueue, &TaskMessage, &xHigherPriorityTaskWoken);
 
 	portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
@@ -273,8 +332,8 @@ void application_timer_setup()
 	};
 
 	am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_LFRC_START, 0);
-	am_hal_ctimer_clear(0, APPLICATION_TIMER_SOURCE);
-	am_hal_ctimer_config(0, &ApplicationTimer);
+	am_hal_ctimer_clear(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
+	am_hal_ctimer_config(APPLICATION_TIMER_NUMBER, &ApplicationTimer);
 
 	am_hal_ctimer_int_register(APPLICATION_TIMER_INT, application_timer_isr);
 	am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
@@ -294,6 +353,7 @@ void application_setup()
     LmParameters.PublicNetworkEnable = true;
     LmParameters.DataBufferMaxSize = LM_BUFFER_SIZE;
     LmParameters.DataBuffer = psLmDataBuffer;
+    LmParameters.IsTxConfirmed = LORAMAC_HANDLER_UNCONFIRMED_MSG;
 
     switch (LmParameters.Region) {
     case LORAMAC_REGION_EU868:
@@ -313,20 +373,27 @@ void application_setup()
     LmCallbacks.OnNetworkParametersChange = OnNetworkParametersChange;
     LmCallbacks.OnMacMlmeRequest = OnMacMlmeRequest;
     LmCallbacks.OnMacMcpsRequest = OnMacMcpsRequest;
+    LmCallbacks.OnSysTimeUpdate = OnSysTimeUpdate;
     LmCallbacks.OnTxData = OnTxData;
     LmCallbacks.OnRxData = OnRxData;
-
-    // these are optional
     LmCallbacks.OnClassChange = OnClassChange;
 
     LmHandlerInit(&LmCallbacks, &LmParameters);
+    LmHandlerSetSystemMaxRxError(20);
 
-    LmComplianceParams.IsDutFPort224On = true;
+    LmComplianceParams.IsDutFPort224On = false;
     LmComplianceParams.OnTxPeriodicityChanged = TclOnTxPeriodicityChanged;
     LmComplianceParams.OnTxFrameCtrlChanged = TclOnTxFrameCtrlChanged;
     LmComplianceParams.OnPingSlotPeriodicityChanged = TclOnPingSlotPeriodicityChanged;
+
     LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE,
                              &LmComplianceParams);
+
+    LmHandlerPackageRegister(PACKAGE_ID_CLOCK_SYNC,
+                             NULL);
+
+    LmHandlerPackageRegister(PACKAGE_ID_REMOTE_MCAST_SETUP,
+                             NULL);
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
 }
@@ -345,9 +412,9 @@ void application_task(void *pvParameters)
 
     TransmitPending = false;
     while (1) {
-        application_handle_command();
-        application_handle_uplink();
         LmHandlerProcess();
+        application_handle_uplink();
+        application_handle_command();
 
         if (MacProcessing) {
             taskENTER_CRITICAL();

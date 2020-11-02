@@ -184,12 +184,12 @@ void prvApplicationPeriodicSubCommand(char *pcWriteBuffer,
 
         uint32_t ui32Period =
             gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-        am_hal_ctimer_period_set(0, APPLICATION_TIMER_SOURCE, ui32Period,
+        am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
                                  (ui32Period >> 1));
-        am_hal_ctimer_start(0, APPLICATION_TIMER_SOURCE);
+        am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
     } else if (strncmp(pcParameterString, "stop", xParameterStringLength) ==
                0) {
-        am_hal_ctimer_stop(0, APPLICATION_TIMER_SOURCE);
+        am_hal_ctimer_stop(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
     }
 }
 
