@@ -63,6 +63,35 @@ CLI_Command_Definition_t ApplicationCommandDefinition = {
     (const char *const) "lorawan:\tLoRaWAN Application Framework.\r\n",
     prvApplicationCommand, -1};
 
+static void ConvertHexString(const char *in, size_t inlen, uint8_t *out,
+                          size_t *outlen)
+{
+    size_t n = 0;
+    char cNum[3];
+    *outlen = 0;
+    while (n < inlen) {
+        switch (in[n]) {
+        case '\\':
+            n++;
+            switch (in[n]) {
+            case 'x':
+                n++;
+                memset(cNum, 0, 3);
+                memcpy(cNum, &in[n], 2);
+                n++;
+                out[*outlen] = strtol(cNum, NULL, 16);
+                break;
+            }
+            break;
+        default:
+            out[*outlen] = in[n];
+            break;
+        }
+        *outlen = *outlen + 1;
+        n++;
+    }
+}
+
 void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                                   const char *pcCommandString)
 {
@@ -130,10 +159,6 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
     if (argc == 2) {
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
-
-        LmAppData.Port = port;
-        LmAppData.BufferSize = xParameterStringLength;
-        LmAppData.Buffer = psLmDataBuffer;
     } else {
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 2,
                                                      &xParameterStringLength);
@@ -147,11 +172,18 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 3,
                                                      &xParameterStringLength);
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
-
-        LmAppData.Port = port;
-        LmAppData.BufferSize = xParameterStringLength;
-        LmAppData.Buffer = psLmDataBuffer;
     }
+
+    size_t length;
+    ConvertHexString(pcParameterString, xParameterStringLength, psLmDataBuffer,
+                  &length);
+
+    LmAppData.Port = port;
+    LmAppData.BufferSize = length;
+    LmAppData.Buffer = psLmDataBuffer;
+
+    am_util_stdio_printf(psLmDataBuffer);
+    am_util_stdio_printf("\r\n");
 
     task_message_t TaskMessage;
     TaskMessage.ui32Event = SEND;

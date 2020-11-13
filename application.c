@@ -74,6 +74,26 @@ static volatile bool ClockSynchronized = false;
 static volatile bool McSessionStarted = false;
 
 /*
+ * Board ID is called by the LoRaWAN stack to
+ * uniquely identify this device
+ */
+void BoardGetUniqueId(uint8_t *id)
+{
+  am_util_id_t i;
+
+  am_util_id_device(&i);
+
+  id[0] = 0xCC;
+  id[1] = 0x5D;
+  id[2] = 0x78;
+  id[3] = 0x02;
+  id[4] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0);
+  id[5] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 8);
+  id[6] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 16);
+  id[7] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 24);
+}
+
+/*
  * LoRaWAN Certification Test Control Layer Callbacks
  */
 static void TclOnTxPeriodicityChanged(uint32_t periodicity)
@@ -120,7 +140,7 @@ static void TclProcessCommand(LmHandlerAppData_t *appData)
     {
     case 0x01:
 		LmComplianceParams.IsDutFPort224On = true;
-        am_util_stdio_printf("Tcl: Device reset requested\r\n");
+        am_util_stdio_printf("Tcl: LoRaWAN MAC layer reset requested\r\n");
     	break;
     case 0x05:
         am_util_stdio_printf("Tcl: Duty cycle set to %d\r\n", appData->Buffer[1]);
@@ -173,21 +193,22 @@ static void OnJoinRequest(LmHandlerJoinParams_t *params)
     } else {
         am_util_stdio_printf("LoRaWAN join successful\r\n\r\n");
 
-        psLmDataBuffer[0] = 0;
         LmAppData.Port = LM_APPLICATION_PORT;
-        LmAppData.BufferSize = 1;
+        LmAppData.BufferSize = 0;
         LmAppData.Buffer = psLmDataBuffer;
-
-        uint32_t ui32Period =
-            gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-        am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
-                                 (ui32Period >> 1));
-        am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
 
         task_message_t TaskMessage;
         TaskMessage.ui32Event = SEND;
         TaskMessage.psContent = &LmAppData;
         xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
+
+/*
+        uint32_t ui32Period =
+            gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
+        am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
+                                 (ui32Period >> 1));
+        am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
+ */
     }
 
     nm_console_print_prompt();
@@ -246,6 +267,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         break;
 
     case LM_APPLICATION_PORT:
+        // process application specific data here
         break;
 
     case 224:
@@ -268,22 +290,16 @@ static void OnTxData(LmHandlerTxParams_t *params)
 
 void application_handle_uplink()
 {
-	if (LmHandlerIsBusy() == true) {
-		return;
-	}
-
 	if (TransmitPending) {
+		if (LmHandlerIsBusy() == true) {
+			return;
+		}
+
 		TransmitPending = false;
 
 	    LmAppData.Port = LM_APPLICATION_PORT;
 
-	    sprintf(psLmDataBuffer, "%d", gui32Counter);
-	    LmAppData.BufferSize = strlen((char *)psLmDataBuffer);
-	    LmAppData.Buffer = psLmDataBuffer;
-	    gui32Counter++;
-
 		LmHandlerSend(&LmAppData, LmParameters.IsTxConfirmed);
-
     }
 }
 
@@ -317,6 +333,11 @@ void application_timer_isr()
 	TaskMessage.ui32Event = SEND;
 	xQueueSendFromISR(ApplicationTaskQueue, &TaskMessage, &xHigherPriorityTaskWoken);
 
+    sprintf((char *)psLmDataBuffer, "%lu", gui32Counter);
+    LmAppData.BufferSize = strlen((char *)psLmDataBuffer);
+    LmAppData.Buffer = psLmDataBuffer;
+    gui32Counter++;
+
 	portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
 }
 
@@ -349,7 +370,7 @@ void application_setup()
 
     LmParameters.Region = LORAMAC_REGION_US915;
     LmParameters.AdrEnable = true;
-    LmParameters.TxDatarate = DR_0;
+    LmParameters.TxDatarate = DR_3;
     LmParameters.PublicNetworkEnable = true;
     LmParameters.DataBufferMaxSize = LM_BUFFER_SIZE;
     LmParameters.DataBuffer = psLmDataBuffer;
@@ -403,7 +424,7 @@ void application_task(void *pvParameters)
     FreeRTOS_CLIRegisterCommand(&ApplicationCommandDefinition);
     ApplicationTaskQueue = xQueueCreate(10, sizeof(task_message_t));
 
-    am_util_stdio_printf_init(nm_console_print);
+    am_util_stdio_printf_init((am_util_stdio_print_char_t)nm_console_print);
     am_util_stdio_printf("\r\n\r\nLoRaWAN Application Demo\r\n\r\n");
     nm_console_print_prompt();
 
@@ -412,9 +433,9 @@ void application_task(void *pvParameters)
 
     TransmitPending = false;
     while (1) {
-        LmHandlerProcess();
-        application_handle_uplink();
         application_handle_command();
+        application_handle_uplink();
+        LmHandlerProcess();
 
         if (MacProcessing) {
             taskENTER_CRITICAL();
