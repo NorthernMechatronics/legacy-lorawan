@@ -43,15 +43,9 @@ endif
 #******************************************************************************
 
 INCLUDES += -I$(NM_SDK)/platform/console
-INCLUDES += -I$(NM_SDK)/platform/lorawan
-INCLUDES += -I$(NM_SDK)/platform/lorawan/LmHandler
-INCLUDES += -I$(NM_SDK)/platform/lorawan/LmHandler/packages
 INCLUDES += -I./soft-se
 
 VPATH += $(NM_SDK)/platform/console
-VPATH += $(NM_SDK)/platform/lorawan
-VPATH += $(NM_SDK)/platform/lorawan/LmHandler
-VPATH += $(NM_SDK)/platform/lorawan/LmHandler/packages
 VPATH += ./soft-se
 
 SRC += console_task.c
@@ -63,16 +57,6 @@ SRC += aes.c
 SRC += cmac.c
 SRC += soft-se.c
 SRC += soft-se-hal.c
-
-# LoRaMAC Application Layer Handler
-SRC += NvmCtxMgmt.c
-SRC += LmHandler.c
-SRC += LmHandlerMsgDisplay.c
-SRC += FragDecoder.c
-SRC += LmhpClockSync.c
-SRC += LmhpCompliance.c
-SRC += LmhpFragmentation.c
-SRC += LmhpRemoteMcastSetup.c
 
 SRC += application.c
 SRC += application_cli.c

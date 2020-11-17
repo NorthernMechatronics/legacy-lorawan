@@ -75,7 +75,10 @@ static volatile bool McSessionStarted = false;
 
 /*
  * Board ID is called by the LoRaWAN stack to
- * uniquely identify this device
+ * uniquely identify this device.
+ * 
+ * This example uses 4 bytes from the processor ID
+ * and another 4 bytes that are user-defined. 
  */
 void BoardGetUniqueId(uint8_t *id)
 {
@@ -83,52 +86,14 @@ void BoardGetUniqueId(uint8_t *id)
 
   am_util_id_device(&i);
 
-  id[0] = 0xCC;
-  id[1] = 0x5D;
-  id[2] = 0x78;
-  id[3] = 0x02;
+  id[0] = 0x01;
+  id[1] = 0x02;
+  id[2] = 0x03;
+  id[3] = 0x04;
   id[4] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0);
   id[5] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 8);
   id[6] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 16);
   id[7] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 24);
-}
-
-/*
- * LoRaWAN Certification Test Control Layer Callbacks
- */
-static void TclOnTxPeriodicityChanged(uint32_t periodicity)
-{
-    am_hal_ctimer_stop(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
-    am_util_stdio_printf("TCL: Transmit periodicity changed requested\r\n");
-
-    // LoRaWAN Certification Protocol Specification, TS009-1.0.0, Table 8, page 14
-    if (periodicity == 0)
-    {
-    	gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
-    }
-    else
-    {
-        // Compliance layer will send back periodicity in milliseconds.
-    	gui32ApplicationTimerPeriod = periodicity / 1000;
-    }
-
-    uint32_t ui32Period =
-        gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-    am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
-                             (ui32Period >> 1));
-    am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
-
-    nm_console_print_prompt();
-}
-
-static void TclOnTxFrameCtrlChanged(LmHandlerMsgTypes_t isTxConfirmed)
-{
-	LmParameters.IsTxConfirmed = isTxConfirmed;
-}
-
-static void TclOnPingSlotPeriodicityChanged(uint8_t pingSlotPeriodicity)
-{
-	LmParameters.PingSlotPeriodicity = pingSlotPeriodicity;
 }
 
 static void TclProcessCommand(LmHandlerAppData_t *appData)
@@ -139,7 +104,6 @@ static void TclProcessCommand(LmHandlerAppData_t *appData)
     switch(appData->Buffer[0])
     {
     case 0x01:
-		LmComplianceParams.IsDutFPort224On = true;
         am_util_stdio_printf("Tcl: LoRaWAN MAC layer reset requested\r\n");
     	break;
     case 0x05:
@@ -299,7 +263,7 @@ void application_handle_uplink()
 
 	    LmAppData.Port = LM_APPLICATION_PORT;
 
-		LmHandlerSend(&LmAppData, LmParameters.IsTxConfirmed);
+		LmHandlerSend(&LmAppData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
     }
 }
 
@@ -374,7 +338,6 @@ void application_setup()
     LmParameters.PublicNetworkEnable = true;
     LmParameters.DataBufferMaxSize = LM_BUFFER_SIZE;
     LmParameters.DataBuffer = psLmDataBuffer;
-    LmParameters.IsTxConfirmed = LORAMAC_HANDLER_UNCONFIRMED_MSG;
 
     switch (LmParameters.Region) {
     case LORAMAC_REGION_EU868:
@@ -401,11 +364,6 @@ void application_setup()
 
     LmHandlerInit(&LmCallbacks, &LmParameters);
     LmHandlerSetSystemMaxRxError(20);
-
-    LmComplianceParams.IsDutFPort224On = false;
-    LmComplianceParams.OnTxPeriodicityChanged = TclOnTxPeriodicityChanged;
-    LmComplianceParams.OnTxFrameCtrlChanged = TclOnTxFrameCtrlChanged;
-    LmComplianceParams.OnPingSlotPeriodicityChanged = TclOnPingSlotPeriodicityChanged;
 
     LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE,
                              &LmComplianceParams);
