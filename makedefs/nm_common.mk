@@ -28,6 +28,7 @@ ifeq ($(OS), Windows_NT)
   CP    = cp
   RM    = rm
 else
+  MKDIR = mkdir -p
   CP   = $(shell which cp 2>/dev/null)
   RM   = $(shell which rm 2>/dev/null)
 endif
