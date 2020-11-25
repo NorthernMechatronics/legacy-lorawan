@@ -86,21 +86,21 @@ all: directories bsp $(BUILDDIR)/$(TARGET).bin
 directories: $(BUILDDIR)
 
 $(BUILDDIR):
-	@mkdir -p $@
+	@$(MKDIR) $@
 
 bsp:
 	$(MAKE) -C $(BSP_DIR) AMBIQ_SDK=$(AMBIQ_SDK)
 
 $(BUILDDIR)/%.o: %.c $(BUILDDIR)/%.d $(INCS)
-	@echo "Compiling $(COMPILERNAME) $<" ;\
+	@echo "Compiling $(COMPILERNAME) $<"
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(BUILDDIR)/%.o: %.s $(BUILDDIR)/%.d $(INCS)
-	@echo "Assembling $(COMPILERNAME) $<" ;\
+	@echo "Assembling $(COMPILERNAME) $<"
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(BUILDDIR)/$(TARGET).axf: $(OBJS)
-	@echo "Linking $@" ;\
+	@echo "Linking $@"
 	$(CC) -Wl,-T,$(LDSCRIPT) -o $@ $(OBJS) $(LFLAGS)
 
 $(BUILDDIR)/$(TARGET).bin: $(BUILDDIR)/$(TARGET).axf
@@ -108,8 +108,8 @@ $(BUILDDIR)/$(TARGET).bin: $(BUILDDIR)/$(TARGET).axf
 	$(OD) $(ODFLAGS) $< > $(BUILDDIR)/$(TARGET).lst
 
 clean:
-	@echo "Cleaning..." ;\
-	$(RM) -f $(OBJS) $(DEPS) $(BUILDDIR)/$(TARGET).a ;\
+	@echo "Cleaning..."
+	$(RM) -f $(OBJS) $(DEPS) $(BUILDDIR)/$(TARGET).a
 	$(RM) -rf $(BUILDDIR)
 
 $(BUILDDIR)/%.d: ;

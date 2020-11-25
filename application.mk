@@ -4,12 +4,12 @@
 # Define the locations of the various SDKs and libraries.
 #
 #******************************************************************************
-NM_SDK    := $(PWD)/../nmsdk
-AMBIQ_SDK := $(PWD)/../AmbiqSuite-R2.5.1
-FREERTOS  := $(PWD)/../FreeRTOS/FreeRTOS
-CORDIO    := $(PWD)/../AmbiqSuite-R2.5.1/third_party/cordio
-UECC      := $(PWD)/../AmbiqSuite-R2.5.1/third_party/uecc
-LORAMAC   := $(PWD)/../LoRaMac-node
+NM_SDK    := $(shell pwd)/../nmsdk
+AMBIQ_SDK := $(shell pwd)/../AmbiqSuite-R2.5.1
+FREERTOS  := $(shell pwd)/../FreeRTOS/FreeRTOS
+CORDIO    := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/cordio
+UECC      := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/uecc
+LORAMAC   := $(shell pwd)/../LoRaMac-node
 
 #******************************************************************************
 #
