@@ -56,6 +56,7 @@ extern void application_task(void *pvParameters);
 #define LM_BUFFER_SIZE 242
 
 extern uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
-extern LmHandlerAppData_t LmAppData;
+extern LmHandlerAppData_t  LmAppData;
+extern LmHandlerMsgTypes_t LmMsgType;
 
 #endif /* _APPLICATION_H_ */

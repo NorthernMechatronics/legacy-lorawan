@@ -64,7 +64,7 @@ CLI_Command_Definition_t ApplicationCommandDefinition = {
     prvApplicationCommand, -1};
 
 static void ConvertHexString(const char *in, size_t inlen, uint8_t *out,
-                          size_t *outlen)
+                             size_t *outlen)
 {
     size_t n = 0;
     char cNum[3];
@@ -152,14 +152,17 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     const char *pcParameterString;
     portBASE_TYPE xParameterStringLength;
 
+    LmHandlerMsgTypes_t ack = LmMsgType;
     uint8_t port = LM_APPLICATION_PORT;
     uint8_t argc = FreeRTOS_CLIGetNumberOfParameters(pcCommandString);
 
     pcParameterString =
         FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
-    if (argc == 2) {
+    switch (argc) {
+    case 2: {
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
-    } else {
+    } break;
+    case 3: {
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 2,
                                                      &xParameterStringLength);
         if (pcParameterString == NULL) {
@@ -173,10 +176,24 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                                                      &xParameterStringLength);
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
     }
+    case 4: {
+        pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 2,
+                                                     &xParameterStringLength);
+        if (pcParameterString == NULL) {
+            strcat(pcWriteBuffer,
+                   "error: missing acknowledgement parameter\r\n");
+            return;
+        } else {
+            ack = atoi(pcParameterString) > 0 ? LORAMAC_HANDLER_CONFIRMED_MSG
+                                              : LORAMAC_HANDLER_UNCONFIRMED_MSG;
+            LmMsgType = ack;
+        }
+    } break;
+    }
 
     size_t length;
     ConvertHexString(pcParameterString, xParameterStringLength, psLmDataBuffer,
-                  &length);
+                     &length);
 
     LmAppData.Port = port;
     LmAppData.BufferSize = length;
@@ -216,9 +233,11 @@ void prvApplicationPeriodicSubCommand(char *pcWriteBuffer,
 
         uint32_t ui32Period =
             gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-        am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
+        am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER,
+                                 APPLICATION_TIMER_SEGMENT, ui32Period,
                                  (ui32Period >> 1));
-        am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
+        am_hal_ctimer_start(APPLICATION_TIMER_NUMBER,
+                            APPLICATION_TIMER_SEGMENT);
     } else if (strncmp(pcParameterString, "stop", xParameterStringLength) ==
                0) {
         am_hal_ctimer_stop(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
@@ -247,7 +266,8 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         task_message_t TaskMessage;
         TaskMessage.ui32Event = JOIN;
         xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
-    } else if (strncmp(pcParameterString, "reset", xParameterStringLength) == 0) {
+    } else if (strncmp(pcParameterString, "reset", xParameterStringLength) ==
+               0) {
         LoRaMacStop();
     } else if (strncmp(pcParameterString, "send", xParameterStringLength) ==
                0) {

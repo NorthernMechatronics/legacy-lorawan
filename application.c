@@ -31,9 +31,9 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include <am_bsp.h>
 #include <am_mcu_apollo.h>
@@ -41,8 +41,8 @@
 
 #include <LmHandler.h>
 #include <LmHandlerMsgDisplay.h>
-#include <LmhpCompliance.h>
 #include <LmhpClockSync.h>
+#include <LmhpCompliance.h>
 #include <LmhpRemoteMcastSetup.h>
 #include <NvmCtxMgmt.h>
 #include <board.h>
@@ -53,7 +53,6 @@
 #include "console_task.h"
 #include "task_message.h"
 
-
 uint32_t gui32ApplicationTimerPeriod;
 static uint32_t gui32Counter;
 
@@ -62,6 +61,7 @@ QueueHandle_t ApplicationTaskQueue;
 
 uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
 LmHandlerAppData_t LmAppData;
+LmHandlerMsgTypes_t LmMsgType;
 
 static LmHandlerParams_t LmParameters;
 static LmHandlerCallbacks_t LmCallbacks;
@@ -82,32 +82,32 @@ static volatile bool McSessionStarted = false;
  */
 void BoardGetUniqueId(uint8_t *id)
 {
-  am_util_id_t i;
+    am_util_id_t i;
 
-  am_util_id_device(&i);
+    am_util_id_device(&i);
 
-  id[0] = 0x01;
-  id[1] = 0x02;
-  id[2] = 0x03;
-  id[3] = 0x04;
-  id[4] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0);
-  id[5] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 8);
-  id[6] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 16);
-  id[7] = (uint8_t) (i.sMcuCtrlDevice.ui32ChipID0 >> 24);
+    id[0] = 0x01;
+    id[1] = 0x02;
+    id[2] = 0x03;
+    id[3] = 0x04;
+    id[4] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0);
+    id[5] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 8);
+    id[6] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 16);
+    id[7] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 24);
 }
 
 static void TclProcessCommand(LmHandlerAppData_t *appData)
 {
-	// Only handle the reset command as that is indicative of the
-	// beginning of compliance testing.  All the other compliance test
-	// commands are handle by the Compliance state machine
-    switch(appData->Buffer[0])
-    {
+    // Only handle the reset command as that is indicative of the
+    // beginning of compliance testing.  All the other compliance test
+    // commands are handle by the Compliance state machine
+    switch (appData->Buffer[0]) {
     case 0x01:
         am_util_stdio_printf("Tcl: LoRaWAN MAC layer reset requested\r\n");
-    	break;
+        break;
     case 0x05:
-        am_util_stdio_printf("Tcl: Duty cycle set to %d\r\n", appData->Buffer[1]);
+        am_util_stdio_printf("Tcl: Duty cycle set to %d\r\n",
+                             appData->Buffer[1]);
         break;
     }
 }
@@ -118,26 +118,23 @@ static void TclProcessCommand(LmHandlerAppData_t *appData)
 static void OnClassChange(DeviceClass_t deviceClass)
 {
     DisplayClassUpdate(deviceClass);
-    switch (deviceClass)
-    {
+    switch (deviceClass) {
     default:
-    case CLASS_A:
-    {
-    	McSessionStarted = false;
-    }
-    	break;
-    case CLASS_B:
-    {
-    	LmHandlerAppData_t appData = { .Buffer = NULL, .BufferSize = 0, .Port = 0, };
-    	LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
-    	McSessionStarted = true;
-    }
-    	break;
-    case CLASS_C:
-    {
-    	McSessionStarted = true;
-    }
-    	break;
+    case CLASS_A: {
+        McSessionStarted = false;
+    } break;
+    case CLASS_B: {
+        LmHandlerAppData_t appData = {
+            .Buffer = NULL,
+            .BufferSize = 0,
+            .Port = 0,
+        };
+        LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
+        McSessionStarted = true;
+    } break;
+    case CLASS_C: {
+        McSessionStarted = true;
+    } break;
     }
 }
 
@@ -166,7 +163,7 @@ static void OnJoinRequest(LmHandlerJoinParams_t *params)
         TaskMessage.psContent = &LmAppData;
         xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
 
-/*
+        /*
         uint32_t ui32Period =
             gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
         am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
@@ -210,7 +207,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     switch (appData->Port) {
     case 0:
         am_util_stdio_printf("MAC command received\r\n");
-    	break;
+        break;
 
     case 3:
         if (appData->BufferSize == 1) {
@@ -235,14 +232,14 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         break;
 
     case 224:
-    	TclProcessCommand(appData);
-    	break;
+        TclProcessCommand(appData);
+        break;
     }
 }
 
-static void OnSysTimeUpdate( bool isSynchronized, int32_t timeCorrection )
+static void OnSysTimeUpdate(bool isSynchronized, int32_t timeCorrection)
 {
-	ClockSynchronized = isSynchronized;
+    ClockSynchronized = isSynchronized;
 }
 
 static void OnTxData(LmHandlerTxParams_t *params)
@@ -254,16 +251,16 @@ static void OnTxData(LmHandlerTxParams_t *params)
 
 void application_handle_uplink()
 {
-	if (TransmitPending) {
-		if (LmHandlerIsBusy() == true) {
-			return;
-		}
+    if (TransmitPending) {
+        if (LmHandlerIsBusy() == true) {
+            return;
+        }
 
-		TransmitPending = false;
+        TransmitPending = false;
 
-	    LmAppData.Port = LM_APPLICATION_PORT;
+        LmAppData.Port = LM_APPLICATION_PORT;
 
-		LmHandlerSend(&LmAppData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
+        LmHandlerSend(&LmAppData, LmMsgType);
     }
 }
 
@@ -289,46 +286,47 @@ void application_handle_command()
 
 void application_timer_isr()
 {
-	portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
-	task_message_t TaskMessage;
+    portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+    task_message_t TaskMessage;
 
-	am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
+    am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
 
-	TaskMessage.ui32Event = SEND;
-	xQueueSendFromISR(ApplicationTaskQueue, &TaskMessage, &xHigherPriorityTaskWoken);
+    TaskMessage.ui32Event = SEND;
+    xQueueSendFromISR(ApplicationTaskQueue, &TaskMessage,
+                      &xHigherPriorityTaskWoken);
 
     sprintf((char *)psLmDataBuffer, "%lu", gui32Counter);
     LmAppData.BufferSize = strlen((char *)psLmDataBuffer);
     LmAppData.Buffer = psLmDataBuffer;
     gui32Counter++;
 
-	portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
+    portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
 }
 
 void application_timer_setup()
 {
-	am_hal_ctimer_config_t ApplicationTimer =
-	{
-		0,
-		(AM_HAL_CTIMER_FN_REPEAT |
-		AM_HAL_CTIMER_INT_ENABLE |
-		APPLICATION_CLOCK_SOURCE),
-		0,
-	};
+    am_hal_ctimer_config_t ApplicationTimer = {
+        0,
+        (AM_HAL_CTIMER_FN_REPEAT | AM_HAL_CTIMER_INT_ENABLE |
+         APPLICATION_CLOCK_SOURCE),
+        0,
+    };
 
-	am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_LFRC_START, 0);
-	am_hal_ctimer_clear(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
-	am_hal_ctimer_config(APPLICATION_TIMER_NUMBER, &ApplicationTimer);
+    am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_LFRC_START, 0);
+    am_hal_ctimer_clear(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
+    am_hal_ctimer_config(APPLICATION_TIMER_NUMBER, &ApplicationTimer);
 
-	am_hal_ctimer_int_register(APPLICATION_TIMER_INT, application_timer_isr);
-	am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
-	NVIC_SetPriority(CTIMER_IRQn, NVIC_configKERNEL_INTERRUPT_PRIORITY);
-	am_hal_ctimer_int_enable(APPLICATION_TIMER_INT);
-	NVIC_EnableIRQ(CTIMER_IRQn);
+    am_hal_ctimer_int_register(APPLICATION_TIMER_INT, application_timer_isr);
+    am_hal_ctimer_int_clear(APPLICATION_TIMER_INT);
+    NVIC_SetPriority(CTIMER_IRQn, NVIC_configKERNEL_INTERRUPT_PRIORITY);
+    am_hal_ctimer_int_enable(APPLICATION_TIMER_INT);
+    NVIC_EnableIRQ(CTIMER_IRQn);
 }
 
 void application_setup()
 {
+    LmMsgType = LORAMAC_HANDLER_UNCONFIRMED_MSG;
+
     BoardInitMcu();
     BoardInitPeriph();
 
@@ -365,14 +363,11 @@ void application_setup()
     LmHandlerInit(&LmCallbacks, &LmParameters);
     LmHandlerSetSystemMaxRxError(20);
 
-    LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE,
-                             &LmComplianceParams);
+    LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE, &LmComplianceParams);
 
-    LmHandlerPackageRegister(PACKAGE_ID_CLOCK_SYNC,
-                             NULL);
+    LmHandlerPackageRegister(PACKAGE_ID_CLOCK_SYNC, NULL);
 
-    LmHandlerPackageRegister(PACKAGE_ID_REMOTE_MCAST_SETUP,
-                             NULL);
+    LmHandlerPackageRegister(PACKAGE_ID_REMOTE_MCAST_SETUP, NULL);
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
 }
@@ -404,4 +399,3 @@ void application_task(void *pvParameters)
         }
     }
 }
-
