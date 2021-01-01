@@ -34,13 +34,16 @@ endif
 #******************************************************************************
 #
 # Step 4
-# Include additional source, header, libraries or paths below.
+# Include additional defines, source, header, libraries or paths below.
 #
 # Examples:
+#   DEFINES  += -Dadditional_define
 #   INCLUDES += -Iadditional_include_path
 #   VPATH    += additional_source_path
 #   LIBS     += -ladditional_library
 #******************************************************************************
+DEFINES += -DSOFT_SE
+#DEFINES += -DSECURE_ELEMENT_PRE_PROVISIONED
 
 INCLUDES += -I$(NM_SDK)/platform/console
 INCLUDES += -I./soft-se

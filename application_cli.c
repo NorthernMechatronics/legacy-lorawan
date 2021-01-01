@@ -46,7 +46,7 @@
 #include <LmHandler.h>
 #include <LmHandlerMsgDisplay.h>
 #include <LmhpCompliance.h>
-#include <NvmCtxMgmt.h>
+#include <NvmDataMgmt.h>
 #include <board.h>
 #include <timer.h>
 

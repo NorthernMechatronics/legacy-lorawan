@@ -44,7 +44,7 @@
 #include <LmhpClockSync.h>
 #include <LmhpCompliance.h>
 #include <LmhpRemoteMcastSetup.h>
-#include <NvmCtxMgmt.h>
+#include <NvmDataMgmt.h>
 #include <board.h>
 #include <timer.h>
 
@@ -52,6 +52,8 @@
 #include "application_cli.h"
 #include "console_task.h"
 #include "task_message.h"
+
+#define LORAWAN_DEFAULT_CLASS CLASS_A
 
 uint32_t gui32ApplicationTimerPeriod;
 static uint32_t gui32Counter;
@@ -152,24 +154,7 @@ static void OnJoinRequest(LmHandlerJoinParams_t *params)
     if (params->Status == LORAMAC_HANDLER_ERROR) {
         LmHandlerJoin();
     } else {
-        am_util_stdio_printf("LoRaWAN join successful\r\n\r\n");
-
-        LmAppData.Port = LM_APPLICATION_PORT;
-        LmAppData.BufferSize = 0;
-        LmAppData.Buffer = psLmDataBuffer;
-
-        task_message_t TaskMessage;
-        TaskMessage.ui32Event = SEND;
-        TaskMessage.psContent = &LmAppData;
-        xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
-
-        /*
-        uint32_t ui32Period =
-            gui32ApplicationTimerPeriod * APPLICATION_TIMER_PERIOD;
-        am_hal_ctimer_period_set(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT, ui32Period,
-                                 (ui32Period >> 1));
-        am_hal_ctimer_start(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
- */
+        //LmHandlerRequestClass(LORAWAN_DEFAULT_CLASS);
     }
 
     nm_console_print_prompt();
@@ -198,11 +183,17 @@ static void OnNetworkParametersChange(CommissioningParams_t *params)
     nm_console_print_prompt();
 }
 
+static void OnNvmDataChange(LmHandlerNvmContextStates_t state, uint16_t size)
+{
+    am_util_stdio_printf("\r\n");
+    DisplayNvmDataChange(state, size);
+    nm_console_print_prompt();
+}
+
 static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 {
     am_util_stdio_printf("\r\n");
     DisplayRxUpdate(appData, params);
-    nm_console_print_prompt();
 
     switch (appData->Port) {
     case 0:
@@ -235,6 +226,8 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         TclProcessCommand(appData);
         break;
     }
+
+    nm_console_print_prompt();
 }
 
 static void OnSysTimeUpdate(bool isSynchronized, int32_t timeCorrection)
@@ -332,7 +325,7 @@ void application_setup()
 
     LmParameters.Region = LORAMAC_REGION_US915;
     LmParameters.AdrEnable = true;
-    LmParameters.TxDatarate = DR_3;
+    LmParameters.TxDatarate = DR_0;
     LmParameters.PublicNetworkEnable = true;
     LmParameters.DataBufferMaxSize = LM_BUFFER_SIZE;
     LmParameters.DataBuffer = psLmDataBuffer;
@@ -359,15 +352,17 @@ void application_setup()
     LmCallbacks.OnTxData = OnTxData;
     LmCallbacks.OnRxData = OnRxData;
     LmCallbacks.OnClassChange = OnClassChange;
+    LmCallbacks.OnNvmDataChange = OnNvmDataChange;
 
-    LmHandlerInit(&LmCallbacks, &LmParameters);
+    LmHandlerErrorStatus_t status = LmHandlerInit(&LmCallbacks, &LmParameters);
+    if (status != LORAMAC_HANDLER_SUCCESS) {
+        am_util_stdio_printf("\r\n\r\nLoRaWAN application framework "
+                             "initialization failed\r\n\r\n");
+        nm_console_print_prompt();
+    }
     LmHandlerSetSystemMaxRxError(20);
 
     LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE, &LmComplianceParams);
-
-    LmHandlerPackageRegister(PACKAGE_ID_CLOCK_SYNC, NULL);
-
-    LmHandlerPackageRegister(PACKAGE_ID_REMOTE_MCAST_SETUP, NULL);
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
 }
@@ -387,8 +382,8 @@ void application_task(void *pvParameters)
     TransmitPending = false;
     while (1) {
         application_handle_command();
-        application_handle_uplink();
         LmHandlerProcess();
+        application_handle_uplink();
 
         if (MacProcessing) {
             taskENTER_CRITICAL();
