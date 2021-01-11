@@ -164,7 +164,7 @@ void system_start(void)
     xTaskCreate(nm_iom_task, "IOM", 512, 0, 4, &nm_iom_task_handle);
 
     xTaskCreate(nm_console_task, "Console", 512, 0, 2, &nm_console_task_handle);
-    xTaskCreate(application_task, "Application", 512, 0, 1,
+    xTaskCreate(application_task, "Application", 512, 0, 2,
                 &application_task_handle);
 
     //
