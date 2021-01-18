@@ -372,7 +372,6 @@ void application_task(void *pvParameters)
     FreeRTOS_CLIRegisterCommand(&ApplicationCommandDefinition);
     ApplicationTaskQueue = xQueueCreate(10, sizeof(task_message_t));
 
-    am_util_stdio_printf_init((am_util_stdio_print_char_t)nm_console_print);
     am_util_stdio_printf("\r\n\r\nLoRaWAN Application Demo\r\n\r\n");
     nm_console_print_prompt();
 
