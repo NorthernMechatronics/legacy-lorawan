@@ -44,6 +44,8 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
+#include "task_message.h"
+
 #include "console_task.h"
 #include "gpio_service.h"
 #include "iom_service.h"
@@ -60,6 +62,7 @@
 //*****************************************************************************
 uint32_t am_freertos_sleep(uint32_t idleTime)
 {
+    am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_CLEAR);
     am_hal_sysctrl_sleep(AM_HAL_SYSCTRL_SLEEP_DEEP);
     return 0;
 }
@@ -70,7 +73,16 @@ uint32_t am_freertos_sleep(uint32_t idleTime)
 // Do necessary 'wakeup' operations here, e.g. to power up/enable peripherals etc.
 //
 //*****************************************************************************
-void am_freertos_wakeup(uint32_t idleTime) { return; }
+void am_freertos_wakeup(uint32_t idleTime)
+{
+    am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_SET);
+
+    portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+    task_message_t task_message;
+    task_message.ui32Event = WAKE;
+    xQueueSendFromISR(ApplicationTaskQueue, &task_message,
+                      &xHigherPriorityTaskWoken);
+}
 
 void am_gpio_isr(void)
 {
@@ -151,6 +163,9 @@ void system_setup(void)
     am_devices_led_array_init(am_bsp_psLEDs, AM_BSP_NUM_LEDS);
     am_devices_led_array_out(am_bsp_psLEDs, AM_BSP_NUM_LEDS, 0x0);
     am_devices_button_array_init(am_bsp_psButtons, AM_BSP_NUM_BUTTONS);
+
+    am_hal_gpio_pinconfig(AM_BSP_GPIO_LED0, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_SET);
 
     am_hal_interrupt_master_enable();
 }

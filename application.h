@@ -46,7 +46,7 @@
 
 extern uint32_t gui32ApplicationTimerPeriod;
 
-typedef enum { JOIN = 0, RESET, SEND } application_command_e;
+typedef enum { JOIN = 0, RESET, SEND, WAKE } application_command_e;
 
 extern TaskHandle_t application_task_handle;
 extern QueueHandle_t ApplicationTaskQueue;
@@ -56,7 +56,7 @@ extern void application_task(void *pvParameters);
 #define LM_BUFFER_SIZE 242
 
 extern uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
-extern LmHandlerAppData_t  LmAppData;
+extern LmHandlerAppData_t LmAppData;
 extern LmHandlerMsgTypes_t LmMsgType;
 
 #endif /* _APPLICATION_H_ */

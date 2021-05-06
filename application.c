@@ -75,6 +75,7 @@ static volatile bool MacProcessing = false;
 static volatile bool ClockSynchronized = false;
 static volatile bool McSessionStarted = false;
 
+static uint32_t timeout = portMAX_DELAY;
 /*
  * Board ID is called by the LoRaWAN stack to
  * uniquely identify this device.
@@ -144,6 +145,8 @@ static void OnMacProcess(void)
 {
     // this is called inside an IRQ
     MacProcessing = true;
+    timeout = 0;
+    am_hal_gpio_state_write(AM_BSP_GPIO_LED4, AM_HAL_GPIO_OUTPUT_SET);
 }
 
 static void OnJoinRequest(LmHandlerJoinParams_t *params)
@@ -265,13 +268,15 @@ void application_handle_command()
     // when it is appropriate to sleep.  We also do not explicitly go to
     // sleep directly and simply do a task yield.  This allows other timing
     // critical radios such as BLE to run their state machines.
-    if (xQueueReceive(ApplicationTaskQueue, &TaskMessage, 0) == pdPASS) {
+    if (xQueueReceive(ApplicationTaskQueue, &TaskMessage, timeout) == pdPASS) {
         switch (TaskMessage.ui32Event) {
         case JOIN:
             LmHandlerJoin();
             break;
         case SEND:
             TransmitPending = true;
+            break;
+        case WAKE:
             break;
         }
     }
@@ -379,17 +384,19 @@ void application_task(void *pvParameters)
     application_timer_setup();
 
     TransmitPending = false;
+    timeout = portMAX_DELAY;
     while (1) {
-        application_handle_command();
         LmHandlerProcess();
         application_handle_uplink();
 
         if (MacProcessing) {
             taskENTER_CRITICAL();
-            MacProcessing = 0;
+            MacProcessing = false;
+            timeout = portMAX_DELAY;
             taskEXIT_CRITICAL();
         } else {
-            taskYIELD();
+            am_hal_gpio_state_write(AM_BSP_GPIO_LED4, AM_HAL_GPIO_OUTPUT_CLEAR);
+            application_handle_command();
         }
     }
 }
