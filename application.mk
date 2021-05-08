@@ -46,6 +46,7 @@ DEFINES += -DSOFT_SE
 #DEFINES += -DSECURE_ELEMENT_PRE_PROVISIONED
 
 INCLUDES += -I$(NM_SDK)/platform/console
+INCLUDES += -I$(NM_SDK)/features/loramac-node/src/boards/nm180100
 INCLUDES += -I./soft-se
 
 VPATH += $(NM_SDK)/platform/console

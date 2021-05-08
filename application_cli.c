@@ -50,6 +50,9 @@
 #include <board.h>
 #include <timer.h>
 
+#include "eeprom_emulation.h"
+#include "eeprom_emulation_conf.h"
+
 #include "application.h"
 #include "application_cli.h"
 #include "console_task.h"
@@ -69,11 +72,14 @@ static void ConvertHexString(const char *in, size_t inlen, uint8_t *out,
     size_t n = 0;
     char cNum[3];
     *outlen = 0;
-    while (n < inlen) {
-        switch (in[n]) {
+    while (n < inlen)
+    {
+        switch (in[n])
+        {
         case '\\':
             n++;
-            switch (in[n]) {
+            switch (in[n])
+            {
             case 'x':
                 n++;
                 memset(cNum, 0, 3);
@@ -101,7 +107,8 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     pcParameterString =
         FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
 
-    if (pcParameterString == NULL) {
+    if (pcParameterString == NULL)
+    {
         strcat(pcWriteBuffer, "usage: lorawan [command] [<args>]\r\n");
         strcat(pcWriteBuffer, "\r\n");
         strcat(pcWriteBuffer, "Supported commands are:\r\n");
@@ -109,19 +116,23 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer, "  reset\r\n");
         strcat(pcWriteBuffer, "  send\r\n");
         strcat(pcWriteBuffer, "  periodic\r\n");
-        strcat(pcWriteBuffer, "  set\r\n");
-        strcat(pcWriteBuffer, "  get\r\n");
+        strcat(pcWriteBuffer, "  format\r\n");
         strcat(pcWriteBuffer, "\r\n");
-        strcat(
-            pcWriteBuffer,
-            "See 'lorawan help [command] for the details of each command.\r\n");
-    } else if (strncmp(pcParameterString, "join", 4) == 0) {
+        strcat(pcWriteBuffer, "See 'lorawan help [command] for the details "
+                              "of each command.\r\n");
+    }
+    else if (strncmp(pcParameterString, "join", 4) == 0)
+    {
         strcat(pcWriteBuffer, "usage: lorawan join\r\n");
         strcat(pcWriteBuffer, "Join a LoRaWAN network.\r\n");
-    } else if (strncmp(pcParameterString, "reset", 5) == 0) {
+    }
+    else if (strncmp(pcParameterString, "reset", 5) == 0)
+    {
         strcat(pcWriteBuffer, "usage: lorawan reset\r\n");
         strcat(pcWriteBuffer, "Stop and reset the LoRaMac stack.\r\n");
-    } else if (strncmp(pcParameterString, "send", 3) == 0) {
+    }
+    else if (strncmp(pcParameterString, "send", 3) == 0)
+    {
         strcat(pcWriteBuffer, "usage: lorawan send <port> <ack> [msg]\r\n");
         strcat(pcWriteBuffer, "\r\n");
         strcat(pcWriteBuffer, "Where:\r\n");
@@ -129,7 +140,9 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer,
                "  ack   request message confirmation from the server\r\n");
         strcat(pcWriteBuffer, "  msg   payload content\r\n");
-    } else if (strncmp(pcParameterString, "periodic", 8) == 0) {
+    }
+    else if (strncmp(pcParameterString, "periodic", 8) == 0)
+    {
         strcat(pcWriteBuffer,
                "usage: lorawan periodic [start <period>|stop]\r\n");
         strcat(pcWriteBuffer, "\r\n");
@@ -139,10 +152,11 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer, "  stop    to stop transmitting\r\n");
         strcat(pcWriteBuffer, "  period  defines how often to transmit in "
                               "seconds (default is 10s)\r\n");
-    } else if (strncmp(pcParameterString, "set", 3) == 0) {
-        //TODO
-    } else if (strncmp(pcParameterString, "get", 3) == 0) {
-        //TODO
+    }
+    else if (strncmp(pcParameterString, "format", 3) == 0)
+    {
+        strcat(pcWriteBuffer, "usage: lorawan format\r\n");
+        strcat(pcWriteBuffer, "format context storage.\r\n");
     }
 }
 
@@ -158,17 +172,24 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
 
     pcParameterString =
         FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
-    switch (argc) {
-    case 2: {
+    switch (argc)
+    {
+    case 2:
+    {
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
-    } break;
-    case 3: {
+    }
+    break;
+    case 3:
+    {
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 2,
                                                      &xParameterStringLength);
-        if (pcParameterString == NULL) {
+        if (pcParameterString == NULL)
+        {
             strcat(pcWriteBuffer, "error: missing port number\r\n");
             return;
-        } else {
+        }
+        else
+        {
             port = atoi(pcParameterString);
         }
 
@@ -176,19 +197,24 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                                                      &xParameterStringLength);
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
     }
-    case 4: {
+    case 4:
+    {
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 2,
                                                      &xParameterStringLength);
-        if (pcParameterString == NULL) {
+        if (pcParameterString == NULL)
+        {
             strcat(pcWriteBuffer,
                    "error: missing acknowledgement parameter\r\n");
             return;
-        } else {
+        }
+        else
+        {
             ack = atoi(pcParameterString) > 0 ? LORAMAC_HANDLER_CONFIRMED_MSG
                                               : LORAMAC_HANDLER_UNCONFIRMED_MSG;
             LmMsgType = ack;
         }
-    } break;
+    }
+    break;
     }
 
     size_t length;
@@ -199,7 +225,7 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     LmAppData.BufferSize = length;
     LmAppData.Buffer = psLmDataBuffer;
 
-    am_util_stdio_printf(psLmDataBuffer);
+    am_util_stdio_printf((char *)psLmDataBuffer);
     am_util_stdio_printf("\r\n");
 
     task_message_t TaskMessage;
@@ -217,17 +243,22 @@ void prvApplicationPeriodicSubCommand(char *pcWriteBuffer,
 
     pcParameterString =
         FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
-    if (pcParameterString == NULL) {
+    if (pcParameterString == NULL)
+    {
         return;
     }
 
-    if (strncmp(pcParameterString, "start", xParameterStringLength) == 0) {
+    if (strncmp(pcParameterString, "start", xParameterStringLength) == 0)
+    {
 
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 3,
                                                      &xParameterStringLength);
-        if (pcParameterString == NULL) {
+        if (pcParameterString == NULL)
+        {
             gui32ApplicationTimerPeriod = 5;
-        } else {
+        }
+        else
+        {
             gui32ApplicationTimerPeriod = atoi(pcParameterString);
         }
 
@@ -238,10 +269,39 @@ void prvApplicationPeriodicSubCommand(char *pcWriteBuffer,
                                  (ui32Period >> 1));
         am_hal_ctimer_start(APPLICATION_TIMER_NUMBER,
                             APPLICATION_TIMER_SEGMENT);
-    } else if (strncmp(pcParameterString, "stop", xParameterStringLength) ==
-               0) {
+    }
+    else if (strncmp(pcParameterString, "stop", xParameterStringLength) == 0)
+    {
         am_hal_ctimer_stop(APPLICATION_TIMER_NUMBER, APPLICATION_TIMER_SEGMENT);
     }
+}
+
+void prvApplicationSyncSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
+                                  const char *pcCommandString)
+{
+    task_message_t TaskMessage;
+    TaskMessage.ui32Event = SYNC;
+    xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
+}
+
+void prvApplicationDatetimeSubCommand(char *pcWriteBuffer,
+                                      size_t xWriteBufferLen,
+                                      const char *pcCommandString)
+{
+    am_hal_rtc_time_t hal_rtc_time;
+    am_hal_rtc_time_get(&hal_rtc_time);
+
+    struct tm ts;
+
+    ts.tm_hour = hal_rtc_time.ui32Hour;
+    ts.tm_min  = hal_rtc_time.ui32Minute;
+    ts.tm_sec  = hal_rtc_time.ui32Second;
+    ts.tm_year = hal_rtc_time.ui32Year + 2000 - 1900;
+    ts.tm_mon  = hal_rtc_time.ui32Month;
+    ts.tm_mday = hal_rtc_time.ui32DayOfMonth;
+
+    char *buf = pcWriteBuffer + strlen(pcWriteBuffer);
+    strftime(buf, 64, "%Y-%m-%d %H:%M:%S %Z", &ts);
 }
 
 portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
@@ -254,33 +314,52 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
 
     pcParameterString =
         FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParameterStringLength);
-    if (pcParameterString == NULL) {
+    if (pcParameterString == NULL)
+    {
         return pdFALSE;
     }
 
-    if (strncmp(pcParameterString, "help", xParameterStringLength) == 0) {
+    if (strncmp(pcParameterString, "help", xParameterStringLength) == 0)
+    {
         prvApplicationHelpSubCommand(pcWriteBuffer, xWriteBufferLen,
                                      pcCommandString);
-    } else if (strncmp(pcParameterString, "join", xParameterStringLength) ==
-               0) {
+    }
+    else if (strncmp(pcParameterString, "join", xParameterStringLength) == 0)
+    {
         task_message_t TaskMessage;
         TaskMessage.ui32Event = JOIN;
         xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
-    } else if (strncmp(pcParameterString, "reset", xParameterStringLength) ==
-               0) {
-        LoRaMacStop();
-    } else if (strncmp(pcParameterString, "send", xParameterStringLength) ==
-               0) {
+    }
+    else if (strncmp(pcParameterString, "reset", xParameterStringLength) == 0)
+    {
+        LoRaMacDeInitialization();
+    }
+    else if (strncmp(pcParameterString, "send", xParameterStringLength) == 0)
+    {
         prvApplicationSendSubCommand(pcWriteBuffer, xWriteBufferLen,
                                      pcCommandString);
-    } else if (strncmp(pcParameterString, "periodic", xParameterStringLength) ==
-               0) {
+    }
+    else if (strncmp(pcParameterString, "periodic", xParameterStringLength) ==
+             0)
+    {
         prvApplicationPeriodicSubCommand(pcWriteBuffer, xWriteBufferLen,
                                          pcCommandString);
-    } else if (strncmp(pcParameterString, "set", xParameterStringLength) == 0) {
-        // TODO
-    } else if (strncmp(pcParameterString, "get", xParameterStringLength) == 0) {
-        // TODO
+    }
+    else if (strncmp(pcParameterString, "format", xParameterStringLength) == 0)
+    {
+        eeprom_init(EEPROM_EMULATION_FLASH_PAGES);
+        eeprom_init(EEPROM_EMULATION_FLASH_PAGES);
+    }
+    else if (strncmp(pcParameterString, "sync", xParameterStringLength) == 0)
+    {
+        prvApplicationSyncSubCommand(pcWriteBuffer, xWriteBufferLen,
+                                     pcCommandString);
+    }
+    else if (strncmp(pcParameterString, "datetime", xParameterStringLength) ==
+             0)
+    {
+        prvApplicationDatetimeSubCommand(pcWriteBuffer, xWriteBufferLen,
+                                         pcCommandString);
     }
 
     return pdFALSE;

@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <am_bsp.h>
 #include <am_mcu_apollo.h>
@@ -112,6 +113,34 @@ static void TclProcessCommand(LmHandlerAppData_t *appData)
         am_util_stdio_printf("Tcl: Duty cycle set to %d\r\n",
                              appData->Buffer[1]);
         break;
+    }
+}
+
+static void application_rtc_set(uint8_t* time_correction)
+{
+    time_t epoch_time;
+
+    epoch_time =
+                time_correction[0]
+            | (time_correction[1] << 8)
+            | (time_correction[2] << 16)
+            | (time_correction[3] << 24);
+
+    struct tm ts;
+
+    if (localtime_r(&epoch_time, &ts))
+    {
+        am_hal_rtc_time_t hal_rtc_time;
+        hal_rtc_time.ui32Hour       = ts.tm_hour; // 0 to 23
+        hal_rtc_time.ui32Minute     = ts.tm_min; // 0 to 59
+        hal_rtc_time.ui32Second     = ts.tm_sec; // 0 to 59
+
+        hal_rtc_time.ui32DayOfMonth = ts.tm_mday; // 1 to 31
+        hal_rtc_time.ui32Month      = ts.tm_mon; // 0 to 11
+        hal_rtc_time.ui32Year       = ts.tm_year + 1900 - 2000; // years since 2000
+        hal_rtc_time.ui32Century    = 0;
+
+        am_hal_rtc_time_set(&hal_rtc_time);
     }
 }
 
@@ -225,6 +254,12 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         // process application specific data here
         break;
 
+
+    case 202:
+        // process MAC layer time synchronization
+        application_rtc_set(&(appData->Buffer[1]));
+        break;
+
     case 224:
         TclProcessCommand(appData);
         break;
@@ -236,6 +271,10 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
 static void OnSysTimeUpdate(bool isSynchronized, int32_t timeCorrection)
 {
     ClockSynchronized = isSynchronized;
+    am_util_stdio_printf("\r\n");
+    am_util_stdio_printf("Clock Synchronized: %d\r\n", ClockSynchronized);
+    am_util_stdio_printf("Correction: %d\r\n", timeCorrection);
+    am_util_stdio_printf("\r\n");
 }
 
 static void OnTxData(LmHandlerTxParams_t *params)
@@ -275,6 +314,9 @@ void application_handle_command()
             break;
         case SEND:
             TransmitPending = true;
+            break;
+        case SYNC:
+            LmhpClockSyncAppTimeReq();
             break;
         case WAKE:
             break;
@@ -366,10 +408,31 @@ void application_setup()
         nm_console_print_prompt();
     }
     LmHandlerSetSystemMaxRxError(20);
-
     LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE, &LmComplianceParams);
+    LmHandlerPackageRegister(PACKAGE_ID_CLOCK_SYNC, NULL);
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
+}
+
+void application_rtc_setup()
+{
+    am_hal_rtc_time_t hal_rtc_time;
+
+    am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_XTAL_START, 0);
+    am_hal_rtc_osc_select(AM_HAL_RTC_OSC_XT);
+    am_hal_rtc_osc_enable();
+
+    hal_rtc_time.ui32Hour       = 0; // 0 to 23
+    hal_rtc_time.ui32Minute     = 0; // 0 to 59
+    hal_rtc_time.ui32Second     = 0; // 0 to 59
+    hal_rtc_time.ui32Hundredths = 00;
+
+    hal_rtc_time.ui32DayOfMonth = 1; // 1 to 31
+    hal_rtc_time.ui32Month      = 0; // 0 to 11
+    hal_rtc_time.ui32Year       = 0; // years since 2000
+    hal_rtc_time.ui32Century    = 0;
+
+    am_hal_rtc_time_set(&hal_rtc_time);
 }
 
 void application_task(void *pvParameters)
@@ -381,6 +444,7 @@ void application_task(void *pvParameters)
     nm_console_print_prompt();
 
     application_setup();
+    application_rtc_setup();
     application_timer_setup();
 
     TransmitPending = false;
