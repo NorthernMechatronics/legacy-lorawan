@@ -117,6 +117,8 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer, "  send\r\n");
         strcat(pcWriteBuffer, "  periodic\r\n");
         strcat(pcWriteBuffer, "  format\r\n");
+        strcat(pcWriteBuffer, "  sync\r\n");
+        strcat(pcWriteBuffer, "  datetime\r\n");
         strcat(pcWriteBuffer, "\r\n");
         strcat(pcWriteBuffer, "See 'lorawan help [command] for the details "
                               "of each command.\r\n");
@@ -156,8 +158,20 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     else if (strncmp(pcParameterString, "format", 3) == 0)
     {
         strcat(pcWriteBuffer, "usage: lorawan format\r\n");
-        strcat(pcWriteBuffer, "format context storage.\r\n");
+        strcat(pcWriteBuffer, "delete and format context storage.\r\n");
     }
+    else if (strncmp(pcParameterString, "sync", 3) == 0)
+    {
+        strcat(pcWriteBuffer, "usage: lorawan sync\r\n");
+        strcat(pcWriteBuffer, "Request MAC layer time synchronization from the LoRaWAN\r\n"
+                              "network server if supported.\r\n");
+    }
+    else if (strncmp(pcParameterString, "datetime", 3) == 0)
+    {
+        strcat(pcWriteBuffer, "usage: lorawan datetime\r\n");
+        strcat(pcWriteBuffer, "Display the current system time.\r\n");
+    }
+
 }
 
 void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
@@ -166,7 +180,7 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     const char *pcParameterString;
     portBASE_TYPE xParameterStringLength;
 
-    LmHandlerMsgTypes_t ack = LmMsgType;
+    LmHandlerMsgTypes_t ack = LORAMAC_HANDLER_UNCONFIRMED_MSG;
     uint8_t port = LM_APPLICATION_PORT;
     uint8_t argc = FreeRTOS_CLIGetNumberOfParameters(pcCommandString);
 
@@ -196,10 +210,24 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 3,
                                                      &xParameterStringLength);
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
+
     }
+    break;
     case 4:
     {
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 2,
+                                                     &xParameterStringLength);
+        if (pcParameterString == NULL)
+        {
+            strcat(pcWriteBuffer, "error: missing port number\r\n");
+            return;
+        }
+        else
+        {
+            port = atoi(pcParameterString);
+        }
+
+        pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 3,
                                                      &xParameterStringLength);
         if (pcParameterString == NULL)
         {
@@ -211,8 +239,10 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         {
             ack = atoi(pcParameterString) > 0 ? LORAMAC_HANDLER_CONFIRMED_MSG
                                               : LORAMAC_HANDLER_UNCONFIRMED_MSG;
-            LmMsgType = ack;
         }
+        pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 4,
+                                                     &xParameterStringLength);
+        memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
     }
     break;
     }
@@ -224,6 +254,7 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     LmAppData.Port = port;
     LmAppData.BufferSize = length;
     LmAppData.Buffer = psLmDataBuffer;
+    LmMsgType = ack;
 
     am_util_stdio_printf((char *)psLmDataBuffer);
     am_util_stdio_printf("\r\n");
@@ -347,7 +378,7 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     }
     else if (strncmp(pcParameterString, "format", xParameterStringLength) == 0)
     {
-        eeprom_init(EEPROM_EMULATION_FLASH_PAGES);
+        eeprom_format(EEPROM_EMULATION_FLASH_PAGES);
         eeprom_init(EEPROM_EMULATION_FLASH_PAGES);
     }
     else if (strncmp(pcParameterString, "sync", xParameterStringLength) == 0)

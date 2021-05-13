@@ -290,11 +290,7 @@ void application_handle_uplink()
         if (LmHandlerIsBusy() == true) {
             return;
         }
-
         TransmitPending = false;
-
-        LmAppData.Port = LM_APPLICATION_PORT;
-
         LmHandlerSend(&LmAppData, LmMsgType);
     }
 }
