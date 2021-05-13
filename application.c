@@ -40,6 +40,9 @@
 #include <am_mcu_apollo.h>
 #include <am_util.h>
 
+#include <FreeRTOS.h>
+#include <queue.h>
+
 #include <LmHandler.h>
 #include <LmHandlerMsgDisplay.h>
 #include <LmhpClockSync.h>
