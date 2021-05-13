@@ -173,6 +173,25 @@ static void OnClassChange(DeviceClass_t deviceClass)
     }
 }
 
+static void OnBeaconStatusChange(LoRaMAcHandlerBeaconParams_t* params)
+{
+    DisplayBeaconUpdate(params);
+
+    switch( params->State )
+    {
+        case LORAMAC_HANDLER_BEACON_RX:
+            break;
+        case LORAMAC_HANDLER_BEACON_LOST:
+            break;
+        case LORAMAC_HANDLER_BEACON_NRX:
+            break;
+        default:
+        {
+            break;
+        }
+    }
+}
+
 static void OnMacProcess(void)
 {
     // this is called inside an IRQ
@@ -399,6 +418,7 @@ void application_setup()
     LmCallbacks.OnRxData = OnRxData;
     LmCallbacks.OnClassChange = OnClassChange;
     LmCallbacks.OnNvmDataChange = OnNvmDataChange;
+    LmCallbacks.OnBeaconStatusChange = OnBeaconStatusChange;
 
     LmHandlerErrorStatus_t status = LmHandlerInit(&LmCallbacks, &LmParameters);
     if (status != LORAMAC_HANDLER_SUCCESS) {
