@@ -429,6 +429,7 @@ void application_setup()
     LmHandlerSetSystemMaxRxError(20);
     LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE, &LmComplianceParams);
     LmHandlerPackageRegister(PACKAGE_ID_CLOCK_SYNC, NULL);
+    LmHandlerPackageRegister(PACKAGE_ID_REMOTE_MCAST_SETUP, NULL);
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
 }
