@@ -46,11 +46,13 @@
 
 extern uint32_t gui32ApplicationTimerPeriod;
 
-typedef enum {
+typedef enum
+{
     JOIN = 0,
     RESET,
     SEND,
-    SYNC,
+    SYNC_APP,
+    SYNC_MAC,
     WAKE
 } application_command_e;
 

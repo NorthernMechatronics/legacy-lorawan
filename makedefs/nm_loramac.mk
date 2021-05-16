@@ -8,8 +8,9 @@ INCLUDES += -I$(LORAMAC)/src/boards
 INCLUDES += -I$(LORAMAC)/src/radio
 INCLUDES += -I$(LORAMAC)/src/system
 INCLUDES += -I$(LORAMAC)/src/apps/LoRaMac/common
-INCLUDES += -I$(LORAMAC)/src/apps/LoRaMac/common/LmHandler
 INCLUDES += -I$(LORAMAC)/src/apps/LoRaMac/common/LmHandler/packages
+#INCLUDES += -I$(LORAMAC)/src/apps/LoRaMac/common/LmHandler
+INCLUDES += -I$(NM_SDK)/features/loramac-node/src/apps/LoRaMac/common/LmHandler
 
 ifdef DEBUG
     LIBS += -lloramac-dev

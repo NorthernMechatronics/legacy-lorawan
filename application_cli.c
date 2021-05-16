@@ -162,16 +162,19 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     }
     else if (strncmp(pcParameterString, "sync", 3) == 0)
     {
-        strcat(pcWriteBuffer, "usage: lorawan sync\r\n");
-        strcat(pcWriteBuffer, "Request MAC layer time synchronization from the LoRaWAN\r\n"
-                              "network server if supported.\r\n");
+        strcat(pcWriteBuffer, "usage: lorawan sync [app|mac]\r\n");
+        strcat(pcWriteBuffer,
+               "app  time synchronization using the application layer.\r\n");
+        strcat(pcWriteBuffer,
+               "mac  time synchronization using the MAC layer.\r\n");
+        strcat(pcWriteBuffer, "Note:  Only valid if the network server "
+                              "supports the command.\r\n");
     }
     else if (strncmp(pcParameterString, "datetime", 3) == 0)
     {
         strcat(pcWriteBuffer, "usage: lorawan datetime\r\n");
         strcat(pcWriteBuffer, "Display the current system time.\r\n");
     }
-
 }
 
 void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
@@ -210,7 +213,6 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         pcParameterString = FreeRTOS_CLIGetParameter(pcCommandString, 3,
                                                      &xParameterStringLength);
         memcpy(psLmDataBuffer, pcParameterString, xParameterStringLength);
-
     }
     break;
     case 4:
@@ -311,8 +313,27 @@ void prvApplicationSyncSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                                   const char *pcCommandString)
 {
     task_message_t TaskMessage;
-    TaskMessage.ui32Event = SYNC;
-    xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
+
+    const char *pcParameterString;
+    portBASE_TYPE xParameterStringLength;
+
+    pcParameterString =
+        FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
+    if (pcParameterString == NULL)
+    {
+        return;
+    }
+
+    if (strncmp(pcParameterString, "app", xParameterStringLength) == 0)
+    {
+        TaskMessage.ui32Event = SYNC_APP;
+        xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
+    }
+    else if (strncmp(pcParameterString, "mac", xParameterStringLength) == 0)
+    {
+        TaskMessage.ui32Event = SYNC_MAC;
+        xQueueSend(ApplicationTaskQueue, &TaskMessage, portMAX_DELAY);
+    }
 }
 
 void prvApplicationDatetimeSubCommand(char *pcWriteBuffer,
@@ -325,10 +346,10 @@ void prvApplicationDatetimeSubCommand(char *pcWriteBuffer,
     struct tm ts;
 
     ts.tm_hour = hal_rtc_time.ui32Hour;
-    ts.tm_min  = hal_rtc_time.ui32Minute;
-    ts.tm_sec  = hal_rtc_time.ui32Second;
+    ts.tm_min = hal_rtc_time.ui32Minute;
+    ts.tm_sec = hal_rtc_time.ui32Second;
     ts.tm_year = hal_rtc_time.ui32Year + 2000 - 1900;
-    ts.tm_mon  = hal_rtc_time.ui32Month;
+    ts.tm_mon = hal_rtc_time.ui32Month;
     ts.tm_mday = hal_rtc_time.ui32DayOfMonth;
 
     char *buf = pcWriteBuffer + strlen(pcWriteBuffer);

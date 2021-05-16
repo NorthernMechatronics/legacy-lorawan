@@ -108,7 +108,8 @@ static void TclProcessCommand(LmHandlerAppData_t *appData)
     // Only handle the reset command as that is indicative of the
     // beginning of compliance testing.  All the other compliance test
     // commands are handle by the Compliance state machine
-    switch (appData->Buffer[0]) {
+    switch (appData->Buffer[0])
+    {
     case 0x01:
         am_util_stdio_printf("Tcl: LoRaWAN MAC layer reset requested\r\n");
         break;
@@ -119,46 +120,22 @@ static void TclProcessCommand(LmHandlerAppData_t *appData)
     }
 }
 
-static void application_rtc_set(uint8_t* time_correction)
-{
-    time_t epoch_time;
-
-    epoch_time =
-                time_correction[0]
-            | (time_correction[1] << 8)
-            | (time_correction[2] << 16)
-            | (time_correction[3] << 24);
-
-    struct tm ts;
-
-    if (localtime_r(&epoch_time, &ts))
-    {
-        am_hal_rtc_time_t hal_rtc_time;
-        hal_rtc_time.ui32Hour       = ts.tm_hour; // 0 to 23
-        hal_rtc_time.ui32Minute     = ts.tm_min; // 0 to 59
-        hal_rtc_time.ui32Second     = ts.tm_sec; // 0 to 59
-
-        hal_rtc_time.ui32DayOfMonth = ts.tm_mday; // 1 to 31
-        hal_rtc_time.ui32Month      = ts.tm_mon; // 0 to 11
-        hal_rtc_time.ui32Year       = ts.tm_year + 1900 - 2000; // years since 2000
-        hal_rtc_time.ui32Century    = 0;
-
-        am_hal_rtc_time_set(&hal_rtc_time);
-    }
-}
-
 /*
  * LoRaMAC Application Layer Callbacks
  */
 static void OnClassChange(DeviceClass_t deviceClass)
 {
     DisplayClassUpdate(deviceClass);
-    switch (deviceClass) {
+    switch (deviceClass)
+    {
     default:
-    case CLASS_A: {
+    case CLASS_A:
+    {
         McSessionStarted = false;
-    } break;
-    case CLASS_B: {
+    }
+    break;
+    case CLASS_B:
+    {
         LmHandlerAppData_t appData = {
             .Buffer = NULL,
             .BufferSize = 0,
@@ -166,29 +143,32 @@ static void OnClassChange(DeviceClass_t deviceClass)
         };
         LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
         McSessionStarted = true;
-    } break;
-    case CLASS_C: {
+    }
+    break;
+    case CLASS_C:
+    {
         McSessionStarted = true;
-    } break;
+    }
+    break;
     }
 }
 
-static void OnBeaconStatusChange(LoRaMAcHandlerBeaconParams_t* params)
+static void OnBeaconStatusChange(LoRaMAcHandlerBeaconParams_t *params)
 {
     DisplayBeaconUpdate(params);
 
-    switch( params->State )
+    switch (params->State)
     {
-        case LORAMAC_HANDLER_BEACON_RX:
-            break;
-        case LORAMAC_HANDLER_BEACON_LOST:
-            break;
-        case LORAMAC_HANDLER_BEACON_NRX:
-            break;
-        default:
-        {
-            break;
-        }
+    case LORAMAC_HANDLER_BEACON_RX:
+        break;
+    case LORAMAC_HANDLER_BEACON_LOST:
+        break;
+    case LORAMAC_HANDLER_BEACON_NRX:
+        break;
+    default:
+    {
+        break;
+    }
     }
 }
 
@@ -205,9 +185,12 @@ static void OnJoinRequest(LmHandlerJoinParams_t *params)
     am_util_stdio_printf("\r\n");
     DisplayJoinRequestUpdate(params);
 
-    if (params->Status == LORAMAC_HANDLER_ERROR) {
+    if (params->Status == LORAMAC_HANDLER_ERROR)
+    {
         LmHandlerJoin();
-    } else {
+    }
+    else
+    {
         //LmHandlerRequestClass(LORAWAN_DEFAULT_CLASS);
     }
 
@@ -249,14 +232,18 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
     am_util_stdio_printf("\r\n");
     DisplayRxUpdate(appData, params);
 
-    switch (appData->Port) {
+    switch (appData->Port)
+    {
     case 0:
         am_util_stdio_printf("MAC command received\r\n");
+        am_util_stdio_printf("Size: %d\r\n", appData->BufferSize);
         break;
 
     case 3:
-        if (appData->BufferSize == 1) {
-            switch (appData->Buffer[0]) {
+        if (appData->BufferSize == 1)
+        {
+            switch (appData->Buffer[0])
+            {
             case 0:
                 LmHandlerRequestClass(CLASS_A);
                 break;
@@ -276,10 +263,8 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         // process application specific data here
         break;
 
-
     case 202:
-        // process MAC layer time synchronization
-        application_rtc_set(&(appData->Buffer[1]));
+        // override application layer time sync here if needed
         break;
 
     case 224:
@@ -308,8 +293,10 @@ static void OnTxData(LmHandlerTxParams_t *params)
 
 void application_handle_uplink()
 {
-    if (TransmitPending) {
-        if (LmHandlerIsBusy() == true) {
+    if (TransmitPending)
+    {
+        if (LmHandlerIsBusy() == true)
+        {
             return;
         }
         TransmitPending = false;
@@ -325,16 +312,21 @@ void application_handle_command()
     // when it is appropriate to sleep.  We also do not explicitly go to
     // sleep directly and simply do a task yield.  This allows other timing
     // critical radios such as BLE to run their state machines.
-    if (xQueueReceive(ApplicationTaskQueue, &TaskMessage, timeout) == pdPASS) {
-        switch (TaskMessage.ui32Event) {
+    if (xQueueReceive(ApplicationTaskQueue, &TaskMessage, timeout) == pdPASS)
+    {
+        switch (TaskMessage.ui32Event)
+        {
         case JOIN:
             LmHandlerJoin();
             break;
         case SEND:
             TransmitPending = true;
             break;
-        case SYNC:
+        case SYNC_APP:
             LmhpClockSyncAppTimeReq();
+            break;
+        case SYNC_MAC:
+            LmHandlerDeviceTimeReq();
             break;
         case WAKE:
             break;
@@ -395,7 +387,8 @@ void application_setup()
     LmParameters.DataBufferMaxSize = LM_BUFFER_SIZE;
     LmParameters.DataBuffer = psLmDataBuffer;
 
-    switch (LmParameters.Region) {
+    switch (LmParameters.Region)
+    {
     case LORAMAC_REGION_EU868:
     case LORAMAC_REGION_RU864:
     case LORAMAC_REGION_CN779:
@@ -421,7 +414,8 @@ void application_setup()
     LmCallbacks.OnBeaconStatusChange = OnBeaconStatusChange;
 
     LmHandlerErrorStatus_t status = LmHandlerInit(&LmCallbacks, &LmParameters);
-    if (status != LORAMAC_HANDLER_SUCCESS) {
+    if (status != LORAMAC_HANDLER_SUCCESS)
+    {
         am_util_stdio_printf("\r\n\r\nLoRaWAN application framework "
                              "initialization failed\r\n\r\n");
         nm_console_print_prompt();
@@ -434,27 +428,6 @@ void application_setup()
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
 }
 
-void application_rtc_setup()
-{
-    am_hal_rtc_time_t hal_rtc_time;
-
-    am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_XTAL_START, 0);
-    am_hal_rtc_osc_select(AM_HAL_RTC_OSC_XT);
-    am_hal_rtc_osc_enable();
-
-    hal_rtc_time.ui32Hour       = 0; // 0 to 23
-    hal_rtc_time.ui32Minute     = 0; // 0 to 59
-    hal_rtc_time.ui32Second     = 0; // 0 to 59
-    hal_rtc_time.ui32Hundredths = 00;
-
-    hal_rtc_time.ui32DayOfMonth = 1; // 1 to 31
-    hal_rtc_time.ui32Month      = 0; // 0 to 11
-    hal_rtc_time.ui32Year       = 0; // years since 2000
-    hal_rtc_time.ui32Century    = 0;
-
-    am_hal_rtc_time_set(&hal_rtc_time);
-}
-
 void application_task(void *pvParameters)
 {
     FreeRTOS_CLIRegisterCommand(&ApplicationCommandDefinition);
@@ -464,21 +437,24 @@ void application_task(void *pvParameters)
     nm_console_print_prompt();
 
     application_setup();
-    application_rtc_setup();
     application_timer_setup();
 
     TransmitPending = false;
     timeout = portMAX_DELAY;
-    while (1) {
+    while (1)
+    {
         LmHandlerProcess();
         application_handle_uplink();
 
-        if (MacProcessing) {
+        if (MacProcessing)
+        {
             taskENTER_CRITICAL();
             MacProcessing = false;
             timeout = portMAX_DELAY;
             taskEXIT_CRITICAL();
-        } else {
+        }
+        else
+        {
             am_hal_gpio_state_write(AM_BSP_GPIO_LED4, AM_HAL_GPIO_OUTPUT_CLEAR);
             application_handle_command();
         }
