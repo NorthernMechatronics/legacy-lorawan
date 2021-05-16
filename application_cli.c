@@ -353,7 +353,11 @@ void prvApplicationDatetimeSubCommand(char *pcWriteBuffer,
     ts.tm_mday = hal_rtc_time.ui32DayOfMonth;
 
     char *buf = pcWriteBuffer + strlen(pcWriteBuffer);
-    strftime(buf, 64, "%Y-%m-%d %H:%M:%S %Z", &ts);
+    strftime(buf, 64, "Hardware Time: %Y-%m-%d %H:%M:%S %Z\r\n", &ts);
+
+    SysTime_t curtime = SysTimeGet();
+    buf += strlen(buf);
+    am_util_stdio_sprintf(buf, "LoRaMAC Stack Time: %d\r\n", curtime.Seconds);
 }
 
 portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,

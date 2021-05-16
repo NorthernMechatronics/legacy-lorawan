@@ -191,7 +191,7 @@ static void OnJoinRequest(LmHandlerJoinParams_t *params)
     }
     else
     {
-        //LmHandlerRequestClass(LORAWAN_DEFAULT_CLASS);
+        LmHandlerRequestClass(LORAWAN_DEFAULT_CLASS);
     }
 
     nm_console_print_prompt();
