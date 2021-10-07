@@ -6,7 +6,7 @@
 #******************************************************************************
 NM_SDK    := $(shell pwd)/../nmsdk
 AMBIQ_SDK := $(shell pwd)/../AmbiqSuite-R2.5.1
-FREERTOS  := $(shell pwd)/../FreeRTOS-Kernel/FreeRTOS
+FREERTOS  := $(shell pwd)/../FreeRTOS-Kernel
 CORDIO    := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/cordio
 UECC      := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/uecc
 LORAMAC   := $(shell pwd)/../LoRaMac-node
@@ -43,7 +43,6 @@ endif
 #   LIBS     += -ladditional_library
 #******************************************************************************
 DEFINES += -DSOFT_SE
-#DEFINES += -DSECURE_ELEMENT_PRE_PROVISIONED
 
 INCLUDES += -I$(NM_SDK)/platform/console
 INCLUDES += -I$(NM_SDK)/features/loramac-node/src/boards/nm180100
