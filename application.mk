@@ -9,7 +9,7 @@ AMBIQ_SDK := $(shell pwd)/../AmbiqSuite-R2.5.1
 FREERTOS  := $(shell pwd)/../FreeRTOS-Kernel
 CORDIO    := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/cordio
 UECC      := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/uecc
-LORAMAC   := $(shell pwd)/../LoRaMac-node
+LORAMAC   := $(shell pwd)/../LoRaMac-node-NMI
 
 #******************************************************************************
 #
@@ -17,7 +17,7 @@ LORAMAC   := $(shell pwd)/../LoRaMac-node
 # Specify the location of the board support package to be used.
 #
 #******************************************************************************
-BSP_DIR := $(NM_SDK)/bsp/nm180100evb
+BSP_DIR := $(NM_SDK)/bsp/expLoRaBLE
 
 #******************************************************************************
 #

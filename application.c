@@ -584,18 +584,6 @@ void application_setup()
     FragmentNumber = 0;
     FragmentReceived = 0;
     PrepareFlashStorage = 0;
-
-    // MIB Setting for application
-    MibRequestConfirm_t mib;
-    uint16_t channels_mask[] = {0xFF00, 0x0000, 0x0000, 0x0000, 0xFF00};
-
-    JoehackPrintf("Setting up channel mask\r\n");
-    mib.Type = MIB_CHANNELS_MASK;
-    mib.Param.ChannelsMask = channels_mask;
-    LoRaMacMibSetRequestConfirm(&mib);
-    JoehackPrintf("Setting up default channel mask\r\n");
-    mib.Type = MIB_CHANNELS_DEFAULT_MASK;
-    LoRaMacMibSetRequestConfirm(&mib);
 }
 
 static char *otaStatusMessage[] = {"Success", "Error", "Failure", "Pending"};
@@ -681,15 +669,4 @@ void application_task(void *pvParameters)
             application_handle_command();
         }
     }
-}
-
-void JoehackPrintf(const char *format, ...)
-{
-    static char buf[256];
-    va_list args;
-    va_start(args, format);
-    vsprintf(buf, format, args);
-    va_end(args);
-
-    am_util_stdio_printf("\r\n%8.3f: %s", TimerGetCurrentTime() / 1000.0, buf);
 }
