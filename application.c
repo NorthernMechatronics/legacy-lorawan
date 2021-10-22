@@ -177,7 +177,9 @@ static void OnMacProcess(void)
     // this is called inside an IRQ
     MacProcessing = true;
     timeout = 0;
+#if defined(AM_BSP_GPIO_LED4)
     am_hal_gpio_state_write(AM_BSP_GPIO_LED4, AM_HAL_GPIO_OUTPUT_SET);
+#endif // defined(AM_BSP_GPIO_LED4)
 }
 
 static void OnJoinRequest(LmHandlerJoinParams_t *params)
@@ -426,6 +428,18 @@ void application_setup()
     LmHandlerPackageRegister(PACKAGE_ID_REMOTE_MCAST_SETUP, NULL);
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
+
+    // MIB Setting for application
+    MibRequestConfirm_t mib;
+    uint16_t channels_mask[] = { 0xFF00, 0x0000, 0x0000, 0x0000, 0xFF00 };
+
+    JoehackPrintf("Setting up channel mask\r\n");
+    mib.Type = MIB_CHANNELS_MASK;
+    mib.Param.ChannelsMask = channels_mask;
+    LoRaMacMibSetRequestConfirm(&mib);
+    JoehackPrintf("Setting up default channel mask\r\n");
+    mib.Type = MIB_CHANNELS_DEFAULT_MASK;
+    LoRaMacMibSetRequestConfirm(&mib);
 }
 
 void application_task(void *pvParameters)
@@ -455,8 +469,24 @@ void application_task(void *pvParameters)
         }
         else
         {
+#if defined(AM_BSP_GPIO_LED4)
             am_hal_gpio_state_write(AM_BSP_GPIO_LED4, AM_HAL_GPIO_OUTPUT_CLEAR);
+#endif // defined(AM_BSP_GPIO_LED4)
             application_handle_command();
         }
     }
+}
+
+#include <stdio.h>
+#include <stdarg.h>
+
+void JoehackPrintf(const char *format, ...)
+{
+  static char buf[256];
+  va_list args;
+  va_start(args, format);
+  vsprintf(buf, format, args);
+  va_end(args);
+
+  am_util_stdio_printf("\r\n%8.3f: %s", TimerGetCurrentTime()/1000.0, buf);
 }
