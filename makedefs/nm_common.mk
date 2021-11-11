@@ -21,6 +21,7 @@ OD   = $(TOOLCHAIN)-objdump
 RD   = $(TOOLCHAIN)-readelf
 AR   = $(TOOLCHAIN)-ar
 SIZE = $(TOOLCHAIN)-size
+PYTHON = python
 
 ifeq ($(OS), Windows_NT)
   $(info Windows Platform Detected)

@@ -25,10 +25,16 @@ BSP_DIR := $(NM_SDK)/bsp/nm180100evb
 # Specify output target name
 #
 #******************************************************************************
+TARGET_VERSION := 0x00
+
 ifdef DEBUG
-    TARGET   := lorawan-dev
+    TARGET      := lorawan-dev
+    TARGET_OTA  := lorawan_ota-dev
+    TARGET_WIRE := lorawan_wire-dev
 else
-    TARGET   := lorawan
+    TARGET      := lorawan
+    TARGET_OTA  := lorawan_ota
+    TARGET_WIRE := lorawan_wire
 endif
 
 #******************************************************************************
