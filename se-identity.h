@@ -76,7 +76,7 @@ extern "C" {
 /*!
  * App/Join server IEEE EUI (big endian)
  */
-#define LORAWAN_JOIN_EUI                                   { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x03, 0x5A, 0x78 }
+#define LORAWAN_JOIN_EUI                                   { 0xb4, 0xc2, 0x31, 0xa3, 0x59, 0xbc, 0x2e, 0x3d }
 /*!
  * Secure-element pin
  */
@@ -102,7 +102,7 @@ extern "C" {
              * WARNING: FOR 1.0.x DEVICES IT IS THE \ref LORAWAN_GEN_APP_KEY                                        \
              */                                                                                                     \
             .KeyID    = APP_KEY,                                                                                    \
-            .KeyValue = { 0x40, 0xA2, 0x0D, 0x0E, 0x92, 0xFC, 0x72, 0x64, 0x13, 0x9B, 0x04, 0x1E, 0xBB, 0x73, 0xCC, 0x75 }, \
+            .KeyValue = { 0x01, 0xc3, 0xf0, 0x04, 0xa2, 0xd6, 0xef, 0xff, 0xe3, 0x2c, 0x4e, 0xda, 0x14, 0xbc, 0xd2, 0xb4 }, \
         },                                                                                                          \
         {                                                                                                           \
             /*!                                                                                                     \
@@ -110,7 +110,7 @@ extern "C" {
              * WARNING: FOR 1.0.x DEVICES IT IS THE \ref LORAWAN_APP_KEY                                            \
              */                                                                                                     \
             .KeyID    = NWK_KEY,                                                                                    \
-            .KeyValue = { 0x40, 0xA2, 0x0D, 0x0E, 0x92, 0xFC, 0x72, 0x64, 0x13, 0x9B, 0x04, 0x1E, 0xBB, 0x73, 0xCC, 0x75 } ,                                                                                   \
+            .KeyValue = { 0x3f, 0x4c, 0xa1, 0x00, 0xe2, 0xfc, 0x67, 0x5e, 0xa1, 0x23, 0xf4, 0xeb, 0x12, 0xc4, 0xa0, 0x12 }, \
         },                                                                                                          \
         {                                                                                                           \
             /*!                                                                                                     \

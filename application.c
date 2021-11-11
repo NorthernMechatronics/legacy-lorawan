@@ -80,12 +80,12 @@ static volatile bool ClockSynchronized = false;
 static volatile bool McSessionStarted = false;
 
 static uint32_t timeout = portMAX_DELAY;
+
 /*
  * Board ID is called by the LoRaWAN stack to
  * uniquely identify this device.
  * 
- * This example uses 4 bytes from the processor ID
- * and another 4 bytes that are user-defined. 
+ * This example uses the processor ID
  */
 void BoardGetUniqueId(uint8_t *id)
 {
@@ -93,14 +93,14 @@ void BoardGetUniqueId(uint8_t *id)
 
     am_util_id_device(&i);
 
-    id[0] = 0x01;
-    id[1] = 0x02;
-    id[2] = 0x03;
-    id[3] = 0x04;
-    id[4] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0);
-    id[5] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 8);
-    id[6] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 16);
-    id[7] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 24);
+    id[0] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0);
+    id[1] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 8);
+    id[2] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 16);
+    id[3] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID0 >> 24);
+    id[4] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID1);
+    id[5] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID1 >> 8);
+    id[6] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID1 >> 16);
+    id[7] = (uint8_t)(i.sMcuCtrlDevice.ui32ChipID1 >> 24);
 }
 
 static void TclProcessCommand(LmHandlerAppData_t *appData)
@@ -263,11 +263,17 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         // process application specific data here
         break;
 
-    case 202:
+    case LM_FUOTA_PORT:
+        break;
+
+    case LM_MULTICAST_PORT:
+        break;
+
+    case LM_CLOCKSYNC_PORT:
         // override application layer time sync here if needed
         break;
 
-    case 224:
+    case LM_COMPLIANCE_PORT:
         TclProcessCommand(appData);
         break;
     }
@@ -299,8 +305,17 @@ void application_handle_uplink()
         {
             return;
         }
-        TransmitPending = false;
-        LmHandlerSend(&LmAppData, LmMsgType);
+
+        if (McSessionStarted == false)
+        {
+            if (ClockSynchronized == false)
+            {
+                LmHandlerDeviceTimeReq();
+            }
+
+            TransmitPending = false;
+            LmHandlerSend(&LmAppData, LmMsgType);
+        }
     }
 }
 

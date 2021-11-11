@@ -1,5 +1,7 @@
 ENTRY(Reset_Handler)
 
+HEAP_SIZE = 0x0800;
+
 MEMORY
 {
     FLASH (rx) : ORIGIN = 0x0000C000, LENGTH = 960K
@@ -32,9 +34,10 @@ SECTIONS
 
 	.heap : {
 		. = ALIGN(8);
-		end = .;
-		*(.heap)
-		*(.heap*)
+		PROVIDE (end = .);
+        __HeapBase = .;
+        . = . + HEAP_SIZE;
+        __HeapLimit = .;
 		. = ALIGN(8);
 	} > SRAM
 

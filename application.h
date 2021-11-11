@@ -61,6 +61,11 @@ extern QueueHandle_t ApplicationTaskQueue;
 extern void application_task(void *pvParameters);
 
 #define LM_APPLICATION_PORT 1
+#define LM_MULTICAST_PORT   200
+#define LM_FUOTA_PORT       201
+#define LM_CLOCKSYNC_PORT   202
+#define LM_COMPLIANCE_PORT  224
+
 #define LM_BUFFER_SIZE 242
 
 extern uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
