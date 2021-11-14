@@ -114,6 +114,7 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
         strcat(pcWriteBuffer, "Supported commands are:\r\n");
         strcat(pcWriteBuffer, "  join\r\n");
         strcat(pcWriteBuffer, "  reset\r\n");
+        strcat(pcWriteBuffer, "  class\r\n");
         strcat(pcWriteBuffer, "  send\r\n");
         strcat(pcWriteBuffer, "  periodic\r\n");
         strcat(pcWriteBuffer, "  format\r\n");
@@ -132,6 +133,11 @@ void prvApplicationHelpSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     {
         strcat(pcWriteBuffer, "usage: lorawan reset\r\n");
         strcat(pcWriteBuffer, "Stop and reset the LoRaMac stack.\r\n");
+    }
+    else if (strncmp(pcParameterString, "class", 5) == 0)
+    {
+        strcat(pcWriteBuffer, "usage: lorawan class [get | set <class>]\r\n");
+        strcat(pcWriteBuffer, "\r\n");
     }
     else if (strncmp(pcParameterString, "send", 3) == 0)
     {
@@ -360,6 +366,65 @@ void prvApplicationDatetimeSubCommand(char *pcWriteBuffer,
     am_util_stdio_sprintf(buf, "LoRaMAC Stack Time: %d\r\n", curtime.Seconds);
 }
 
+void prvApplicationClassSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
+                                  const char *pcCommandString)
+{
+    task_message_t TaskMessage;
+
+    const char *pcParameterString;
+    portBASE_TYPE xParameterStringLength;
+
+    pcParameterString =
+        FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
+    if (pcParameterString == NULL)
+    {
+        return;
+    }
+
+    if (strncmp(pcParameterString, "get", xParameterStringLength) == 0)
+    {
+        DeviceClass_t cls = LmHandlerGetCurrentClass();
+        switch(cls)
+        {
+        case CLASS_A:
+            am_util_stdio_printf("Class A\r\n");
+            break;
+        case CLASS_B:
+            am_util_stdio_printf("Class B\r\n");
+            break;
+        case CLASS_C:
+            am_util_stdio_printf("Class C\r\n");
+            break;
+        }
+    }
+    else if (strncmp(pcParameterString, "set", xParameterStringLength) == 0)
+    {
+        pcParameterString =
+            FreeRTOS_CLIGetParameter(pcCommandString, 3, &xParameterStringLength);
+        if (pcParameterString == NULL)
+        {
+            am_util_stdio_printf("Missing class specifier\r\n");
+            return;
+        }
+
+        if (strcmp(pcParameterString, "A") == 0)
+        {
+            LmHandlerRequestClass(CLASS_A);
+            am_util_stdio_printf("Class A requested\r\n");
+        }
+        else if (strcmp(pcParameterString, "B") == 0)
+        {
+            LmHandlerRequestClass(CLASS_B);
+            am_util_stdio_printf("Class B requested\r\n");
+        }
+        else if (strcmp(pcParameterString, "C") == 0)
+        {
+            LmHandlerRequestClass(CLASS_C);
+            am_util_stdio_printf("Class C requested\r\n");
+        }
+    }
+}
+
 portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                                     const char *pcCommandString)
 {
@@ -389,6 +454,11 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     else if (strncmp(pcParameterString, "reset", xParameterStringLength) == 0)
     {
         LoRaMacDeInitialization();
+    }
+    else if (strncmp(pcParameterString, "class", xParameterStringLength) == 0)
+    {
+        prvApplicationClassSubCommand(pcWriteBuffer, xWriteBufferLen,
+                pcCommandString);
     }
     else if (strncmp(pcParameterString, "send", xParameterStringLength) == 0)
     {
