@@ -48,6 +48,11 @@ endif
 #   VPATH    += additional_source_path
 #   LIBS     += -ladditional_library
 #******************************************************************************
+#INCLUDES += -I$(AMBIQ_SDK)/bootloader
+#VPATH += $(AMBIQ_SDK)/bootloader
+#SRC += am_multi_boot.c
+#SRC += am_bootloader.c
+
 DEFINES += -DSOFT_SE
 
 INCLUDES += -I$(NM_SDK)/platform/console

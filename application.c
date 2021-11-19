@@ -1,7 +1,7 @@
 /*
  * BSD 3-Clause License
  *
- * Copyright (c) 2020, Northern Mechatronics, Inc.
+ * Copyright (c) 2021, Northern Mechatronics, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,9 +48,13 @@
 #include <LmhpClockSync.h>
 #include <LmhpCompliance.h>
 #include <LmhpRemoteMcastSetup.h>
+#include <LmhpFragmentation.h>
 #include <NvmDataMgmt.h>
 #include <board.h>
 #include <timer.h>
+#include <utilities.h>
+
+#include "ota_config.h"
 
 #include "application.h"
 #include "application_cli.h"
@@ -58,6 +62,8 @@
 #include "task_message.h"
 
 #define LORAWAN_DEFAULT_CLASS CLASS_A
+
+#define FRAGMENTATION_DATA_FRAGMENT 0x08
 
 uint32_t gui32ApplicationTimerPeriod;
 static uint32_t gui32Counter;
@@ -69,17 +75,26 @@ uint8_t psLmDataBuffer[LM_BUFFER_SIZE];
 LmHandlerAppData_t LmAppData;
 LmHandlerMsgTypes_t LmMsgType;
 
+static uint8_t FragDataBlockAuthReqBuffer[5];
+
 static LmHandlerParams_t LmParameters;
 static LmHandlerCallbacks_t LmCallbacks;
-
+static LmhpFragmentationParams_t LmFragParams;
 static LmhpComplianceParams_t LmComplianceParams;
 
 static volatile bool TransmitPending = false;
 static volatile bool MacProcessing = false;
 static volatile bool ClockSynchronized = false;
 static volatile bool McSessionStarted = false;
+static volatile bool TransferCompleted = false;
 
 static uint32_t timeout = portMAX_DELAY;
+
+static uint8_t UnfragmentedData[14336];
+static uint8_t FragmentSize;
+static uint8_t FragmentNumber;
+static uint8_t FragmentReceived;
+static uint8_t PrepareFlashStorage;
 
 /*
  * Board ID is called by the LoRaWAN stack to
@@ -166,9 +181,7 @@ static void OnBeaconStatusChange(LoRaMAcHandlerBeaconParams_t *params)
     case LORAMAC_HANDLER_BEACON_NRX:
         break;
     default:
-    {
         break;
-    }
     }
 }
 
@@ -263,10 +276,21 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         // process application specific data here
         break;
 
-    case LM_FUOTA_PORT:
+    case LM_MULTICAST_PORT:
         break;
 
-    case LM_MULTICAST_PORT:
+    case LM_FUOTA_PORT:
+        // FRAGMENTATION_FRAG_SESSION_SETUP_REQ
+        if (appData->Buffer[0] == 0x02)
+        {
+            uint32_t fragNb = 0;
+            uint32_t fragSize = 0;
+
+            memcpy(&fragNb, &(appData->Buffer[2]), 2);
+            memcpy(&fragSize, &(appData->Buffer[4]), 1);
+            am_util_stdio_printf("Erasing: %d, %d\r\n", fragNb, fragSize);
+            // TODO: Erase flash here
+        }
         break;
 
     case LM_CLOCKSYNC_PORT:
@@ -297,6 +321,62 @@ static void OnTxData(LmHandlerTxParams_t *params)
     nm_console_print_prompt();
 }
 
+static void OnFragProgress(uint16_t counter, uint16_t blocks, uint8_t size, uint16_t lost)
+{
+    am_util_stdio_printf( "\r\n###### =========== FRAG_DECODER ============ ######\r\n" );
+    am_util_stdio_printf( "######               PROGRESS                ######\r\n");
+    am_util_stdio_printf( "###### ===================================== ######\r\n");
+    am_util_stdio_printf( "RECEIVED    : %5d / %5d Fragments\r\n", counter, blocks );
+    am_util_stdio_printf( "              %5d / %5d Bytes\r\n", counter * size, blocks * size );
+    am_util_stdio_printf( "LOST        :       %7d Fragments\r\n\r\n", lost );
+}
+
+static void OnFragDone(int32_t status, uint32_t size)
+{
+    uint32_t rx_crc = Crc32(UnfragmentedData, size);
+
+    FragDataBlockAuthReqBuffer[0] = 0x05;
+    FragDataBlockAuthReqBuffer[1] =         rx_crc & 0x000000FF;
+    FragDataBlockAuthReqBuffer[2] =  (rx_crc >> 8) & 0x000000FF;
+    FragDataBlockAuthReqBuffer[3] = (rx_crc >> 16) & 0x000000FF;
+    FragDataBlockAuthReqBuffer[4] = (rx_crc >> 24) & 0x000000FF;
+
+    TransferCompleted = true;
+
+    am_util_stdio_printf( "\r\n");
+    am_util_stdio_printf( "###### =========== FRAG_DECODER ============ ######\r\n" );
+    am_util_stdio_printf( "######               FINISHED                ######\r\n");
+    am_util_stdio_printf( "###### ===================================== ######\r\n");
+    am_util_stdio_printf( "STATUS : %ld\r\n", status );
+    am_util_stdio_printf( "SIZE   : %ld\r\n", size );
+    am_util_stdio_printf( "CRC    : %08lX\n\n", rx_crc );
+}
+
+
+static int8_t FragDecoderWrite(uint32_t offset, uint8_t *data, uint32_t size)
+{
+    /*
+    for (uint32_t i = 0; i < size; i++)
+    {
+        UnfragmentedData[offset + i] = data[i];
+    }
+    */
+
+    return 0;
+}
+
+static int8_t FragDecoderRead(uint32_t offset, uint8_t *data, uint32_t size)
+{
+    /*
+    for (uint32_t i = 0; i < size; i++)
+    {
+        data[i] = UnfragmentedData[offset + i];
+    }
+    */
+
+    return 0;
+}
+
 void application_handle_uplink()
 {
     if (TransmitPending)
@@ -308,13 +388,28 @@ void application_handle_uplink()
 
         if (McSessionStarted == false)
         {
-            if (ClockSynchronized == false)
+            if (TransferCompleted)
             {
-                LmHandlerDeviceTimeReq();
-            }
+                LmHandlerAppData_t appData = {
+                    .Buffer = FragDataBlockAuthReqBuffer,
+                    .BufferSize = 5,
+                    .Port = LM_FUOTA_PORT,
+                };
 
-            TransmitPending = false;
-            LmHandlerSend(&LmAppData, LmMsgType);
+                TransferCompleted = false;
+                TransmitPending = false;
+                LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
+            }
+            else
+            {
+                if (ClockSynchronized == false)
+                {
+                    LmHandlerDeviceTimeReq();
+                }
+
+                TransmitPending = false;
+                LmHandlerSend(&LmAppData, LmMsgType);
+            }
         }
     }
 }
@@ -428,6 +523,11 @@ void application_setup()
     LmCallbacks.OnNvmDataChange = OnNvmDataChange;
     LmCallbacks.OnBeaconStatusChange = OnBeaconStatusChange;
 
+    LmFragParams.OnProgress = OnFragProgress;
+    LmFragParams.OnDone = OnFragDone;
+    LmFragParams.DecoderCallbacks.FragDecoderWrite = FragDecoderWrite;
+    LmFragParams.DecoderCallbacks.FragDecoderRead = FragDecoderRead;
+
     LmHandlerErrorStatus_t status = LmHandlerInit(&LmCallbacks, &LmParameters);
     if (status != LORAMAC_HANDLER_SUCCESS)
     {
@@ -439,8 +539,66 @@ void application_setup()
     LmHandlerPackageRegister(PACKAGE_ID_COMPLIANCE, &LmComplianceParams);
     LmHandlerPackageRegister(PACKAGE_ID_CLOCK_SYNC, NULL);
     LmHandlerPackageRegister(PACKAGE_ID_REMOTE_MCAST_SETUP, NULL);
+    LmHandlerPackageRegister(PACKAGE_ID_FRAGMENTATION, &LmFragParams);
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
+
+    memset(UnfragmentedData, 0, 512);
+    FragmentSize = 0;
+    FragmentNumber = 0;
+    FragmentReceived = 0;
+    PrepareFlashStorage = 0;
+}
+
+static char *otaStatusMessage[] =
+    {
+        "Success",
+        "Error",
+        "Failure",
+        "Pending"
+    };
+static void
+dump_ota_status(void)
+{
+    uint32_t *pOtaDesc = (uint32_t *)(OTA_POINTER_LOCATION & ~(AM_HAL_FLASH_PAGE_SIZE - 1));
+    uint32_t i;
+
+    // Check if the current content at OTA descriptor is valid
+    for (i = 0; i < AM_HAL_SECURE_OTA_MAX_OTA + 1; i++)
+    {
+        // Make sure the image address looks okay
+        if (pOtaDesc[i] == 0xFFFFFFFF)
+        {
+            break;
+        }
+        if (((pOtaDesc[i] & 0x3) == AM_HAL_OTA_STATUS_ERROR) || ((pOtaDesc[i] & ~0x3) >= 0x100000))
+        {
+            break;
+        }
+    }
+    if (pOtaDesc[i] == 0xFFFFFFFF)
+    {
+        am_util_stdio_printf("\r\nValid Previous OTA state\r\n");
+        // It seems in last boot this was used as OTA descriptor
+        // Dump previous OTA information
+        am_hal_ota_status_t otaStatus[AM_HAL_SECURE_OTA_MAX_OTA];
+        am_hal_get_ota_status(pOtaDesc, AM_HAL_SECURE_OTA_MAX_OTA, otaStatus);
+        for ( uint32_t i = 0; i < AM_HAL_SECURE_OTA_MAX_OTA; i++ )
+        {
+            if ((uint32_t)otaStatus[i].pImage == 0xFFFFFFFF)
+            {
+                break;
+            }
+            {
+                am_util_stdio_printf("\r\nPrevious OTA: Blob Addr: 0x%x - Result %s\r\n",
+                                     otaStatus[i].pImage, otaStatusMessage[otaStatus[i].status]);
+            }
+        }
+    }
+    else
+    {
+        am_util_stdio_printf("\r\nNo Previous OTA state\r\n");
+    }
 }
 
 void application_task(void *pvParameters)
@@ -450,6 +608,8 @@ void application_task(void *pvParameters)
 
     am_util_stdio_printf("\r\n\r\nLoRaWAN Application Demo\r\n\r\n");
     nm_console_print_prompt();
+
+    dump_ota_status();
 
     application_setup();
     application_timer_setup();

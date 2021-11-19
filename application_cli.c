@@ -53,6 +53,8 @@
 #include "eeprom_emulation.h"
 #include "eeprom_emulation_conf.h"
 
+#include "ota_config.h"
+
 #include "application.h"
 #include "application_cli.h"
 #include "console_task.h"
@@ -425,6 +427,17 @@ void prvApplicationClassSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     }
 }
 
+void prvApplicationOtaSubCommand(char *pcWriteBuffer,
+                                      size_t xWriteBufferLen,
+                                      const char *pcCommandString)
+{
+    uint32_t *pOtaDesc = (uint32_t *)(OTA_POINTER_LOCATION);
+    am_hal_ota_init(AM_HAL_FLASH_PROGRAM_KEY, pOtaDesc);
+
+    uint8_t  magic = ((uint8_t *)OTA_FLASH_ADDRESS)[3];
+    am_hal_ota_add(AM_HAL_FLASH_PROGRAM_KEY, magic, (uint32_t *)(OTA_FLASH_ADDRESS));
+}
+
 portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
                                     const char *pcCommandString)
 {
@@ -485,6 +498,11 @@ portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
              0)
     {
         prvApplicationDatetimeSubCommand(pcWriteBuffer, xWriteBufferLen,
+                                         pcCommandString);
+    }
+    else if (strncmp(pcParameterString, "ota", xParameterStringLength) == 0)
+    {
+        prvApplicationOtaSubCommand(pcWriteBuffer, xWriteBufferLen,
                                          pcCommandString);
     }
 

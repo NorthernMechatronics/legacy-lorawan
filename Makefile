@@ -120,6 +120,7 @@ $(BUILDDIR)/$(TARGET_OTA).bin: $(BUILDDIR)/$(TARGET).bin
 	@echo "Generating OTA image $@"
 	$(PYTHON) ./tools/create_cust_image_blob.py --bin $< --load-address 0xc000 --magic-num 0xcb -o $(BUILDDIR)/$(TARGET_OTA)_temp --version $(TARGET_VERSION)
 	$(PYTHON) ./tools/ota_binary_converter.py --appbin $(BUILDDIR)/$(TARGET_OTA)_temp.bin -o $(BUILDDIR)/$(TARGET_OTA)
+	@$(CP) $(BUILDDIR)/$(TARGET_OTA)_temp.bin $(BUILDDIR)/$(TARGET_OTA)_LoRaWAN.bin
 	@$(RM) -rf $(BUILDDIR)/$(TARGET_OTA)_temp.bin
 
 $(BUILDDIR)/$(TARGET_WIRE).bin: $(BUILDDIR)/$(TARGET).bin
