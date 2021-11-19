@@ -38,7 +38,7 @@
  */
 
 #define OTA_FLASH_ADDRESS      0x00088000  // second flash bank
-#define OTA_FLASH_MAX_SIZE     0x00074000  // 327k
+#define OTA_FLASH_MAX_SIZE     0x00074000  // 475k
 #define OTA_POINTER_LOCATION   0x00086000
 
 #endif
