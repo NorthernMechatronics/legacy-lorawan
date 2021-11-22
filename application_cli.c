@@ -266,6 +266,7 @@ void prvApplicationSendSubCommand(char *pcWriteBuffer, size_t xWriteBufferLen,
     LmAppData.Buffer = psLmDataBuffer;
     LmMsgType = ack;
 
+    psLmDataBuffer[length] = 0;
     am_util_stdio_printf((char *)psLmDataBuffer);
     am_util_stdio_printf("\r\n");
 
@@ -431,11 +432,63 @@ void prvApplicationOtaSubCommand(char *pcWriteBuffer,
                                       size_t xWriteBufferLen,
                                       const char *pcCommandString)
 {
-    uint32_t *pOtaDesc = (uint32_t *)(OTA_POINTER_LOCATION);
-    am_hal_ota_init(AM_HAL_FLASH_PROGRAM_KEY, pOtaDesc);
+    const char *pcParameterString;
+    portBASE_TYPE xParameterStringLength;
 
-    uint8_t  magic = ((uint8_t *)OTA_FLASH_ADDRESS)[3];
-    am_hal_ota_add(AM_HAL_FLASH_PROGRAM_KEY, magic, (uint32_t *)(OTA_FLASH_ADDRESS));
+    pcParameterString =
+        FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParameterStringLength);
+
+    if (pcParameterString == NULL)
+    {
+        uint32_t *pOtaDesc = (uint32_t *)(OTA_POINTER_LOCATION);
+        am_hal_ota_init(AM_HAL_FLASH_PROGRAM_KEY, pOtaDesc);
+
+        uint8_t  magic = ((uint8_t *)OTA_FLASH_ADDRESS)[3];
+        am_hal_ota_add(AM_HAL_FLASH_PROGRAM_KEY, magic, (uint32_t *)(OTA_FLASH_ADDRESS));
+
+        return;
+    }
+
+    if (strncmp(pcParameterString, "erase", xParameterStringLength) == 0)
+    {
+        pcParameterString =
+            FreeRTOS_CLIGetParameter(pcCommandString, 3, &xParameterStringLength);
+        if (pcParameterString == NULL)
+        {
+            am_util_stdio_printf("Missing address\r\n");
+            return;
+        }
+
+        uint32_t address = strtol(pcParameterString, NULL, 0);
+
+        am_hal_flash_page_erase(AM_HAL_FLASH_PROGRAM_KEY,
+                AM_HAL_FLASH_ADDR2INST(address),
+                AM_HAL_FLASH_ADDR2PAGE(address));
+    }
+    else if (strncmp(pcParameterString, "write", xParameterStringLength) == 0)
+    {
+        pcParameterString =
+            FreeRTOS_CLIGetParameter(pcCommandString, 3, &xParameterStringLength);
+        if (pcParameterString == NULL)
+        {
+            am_util_stdio_printf("Missing address\r\n");
+            return;
+        }
+        uint32_t address = strtol(pcParameterString, NULL, 0);
+
+        pcParameterString =
+            FreeRTOS_CLIGetParameter(pcCommandString, 4, &xParameterStringLength);
+        if (pcParameterString == NULL)
+        {
+            am_util_stdio_printf("Missing value\r\n");
+            return;
+        }
+
+        uint32_t value = strtol(pcParameterString, NULL, 0);
+
+        am_hal_flash_program_main(AM_HAL_FLASH_PROGRAM_KEY, &value,
+                (uint32_t *)address, 1);
+    }
 }
 
 portBASE_TYPE prvApplicationCommand(char *pcWriteBuffer, size_t xWriteBufferLen,

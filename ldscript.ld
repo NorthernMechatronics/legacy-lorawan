@@ -1,6 +1,6 @@
 ENTRY(Reset_Handler)
 
-HEAP_SIZE = 0x0800;
+HEAP_SIZE = 0x2000;
 
 MEMORY
 {

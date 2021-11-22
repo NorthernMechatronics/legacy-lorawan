@@ -90,11 +90,11 @@ static volatile bool TransferCompleted = false;
 
 static uint32_t timeout = portMAX_DELAY;
 
-static uint8_t UnfragmentedData[14336];
 static uint8_t FragmentSize;
 static uint8_t FragmentNumber;
 static uint8_t FragmentReceived;
 static uint8_t PrepareFlashStorage;
+static LmHandlerAppData_t fragComplete;
 
 /*
  * Board ID is called by the LoRaWAN stack to
@@ -280,17 +280,7 @@ static void OnRxData(LmHandlerAppData_t *appData, LmHandlerRxParams_t *params)
         break;
 
     case LM_FUOTA_PORT:
-        // FRAGMENTATION_FRAG_SESSION_SETUP_REQ
-        if (appData->Buffer[0] == 0x02)
-        {
-            uint32_t fragNb = 0;
-            uint32_t fragSize = 0;
 
-            memcpy(&fragNb, &(appData->Buffer[2]), 2);
-            memcpy(&fragSize, &(appData->Buffer[4]), 1);
-            am_util_stdio_printf("Erasing: %d, %d\r\n", fragNb, fragSize);
-            // TODO: Erase flash here
-        }
         break;
 
     case LM_CLOCKSYNC_PORT:
@@ -333,7 +323,7 @@ static void OnFragProgress(uint16_t counter, uint16_t blocks, uint8_t size, uint
 
 static void OnFragDone(int32_t status, uint32_t size)
 {
-    uint32_t rx_crc = Crc32(UnfragmentedData, size);
+    uint32_t rx_crc = Crc32((uint8_t *)OTA_FLASH_ADDRESS, size);
 
     FragDataBlockAuthReqBuffer[0] = 0x05;
     FragDataBlockAuthReqBuffer[1] =         rx_crc & 0x000000FF;
@@ -342,6 +332,7 @@ static void OnFragDone(int32_t status, uint32_t size)
     FragDataBlockAuthReqBuffer[4] = (rx_crc >> 24) & 0x000000FF;
 
     TransferCompleted = true;
+    TransmitPending = true;
 
     am_util_stdio_printf( "\r\n");
     am_util_stdio_printf( "###### =========== FRAG_DECODER ============ ######\r\n" );
@@ -352,27 +343,57 @@ static void OnFragDone(int32_t status, uint32_t size)
     am_util_stdio_printf( "CRC    : %08lX\n\n", rx_crc );
 }
 
-
 static int8_t FragDecoderWrite(uint32_t offset, uint8_t *data, uint32_t size)
 {
-    /*
-    for (uint32_t i = 0; i < size; i++)
-    {
-        UnfragmentedData[offset + i] = data[i];
-    }
-    */
+
+    uint32_t *destination = (uint32_t *)(OTA_FLASH_ADDRESS + offset);
+    uint32_t source[64];
+    uint32_t length = size >> 2;
+
+    am_util_stdio_printf("\r\nDecoder Write: 0x%x, 0x%x, %d\r\n", (uint32_t)destination, (uint32_t)source, length);
+    memcpy(source, data, size);
+
+    taskENTER_CRITICAL();
+
+    am_hal_flash_program_main(AM_HAL_FLASH_PROGRAM_KEY, source,
+            destination, length);
+
+    taskEXIT_CRITICAL();
 
     return 0;
 }
 
 static int8_t FragDecoderRead(uint32_t offset, uint8_t *data, uint32_t size)
 {
-    /*
+    uint8_t *UnfragmentedData = (uint8_t *)(OTA_FLASH_ADDRESS);
     for (uint32_t i = 0; i < size; i++)
     {
         data[i] = UnfragmentedData[offset + i];
     }
-    */
+
+    return 0;
+}
+
+static int8_t FragDecoderErase(uint32_t offset, uint32_t size)
+{
+    uint32_t totalPage = (size >> 13) + 1;
+    uint32_t address = OTA_FLASH_ADDRESS;
+
+    am_util_stdio_printf("\r\nErasing %d pages at 0x%x\r\n", totalPage, address);
+
+    for (int i = 0; i < totalPage; i++)
+    {
+        address += AM_HAL_FLASH_PAGE_SIZE;
+        am_util_stdio_printf("Instance: %d, Page: %d\r\n", AM_HAL_FLASH_ADDR2INST(address), AM_HAL_FLASH_ADDR2PAGE(address));
+
+        taskENTER_CRITICAL();
+
+        am_hal_flash_page_erase(AM_HAL_FLASH_PROGRAM_KEY,
+                AM_HAL_FLASH_ADDR2INST(address),
+                AM_HAL_FLASH_ADDR2PAGE(address));
+
+        taskEXIT_CRITICAL();
+    }
 
     return 0;
 }
@@ -390,15 +411,14 @@ void application_handle_uplink()
         {
             if (TransferCompleted)
             {
-                LmHandlerAppData_t appData = {
-                    .Buffer = FragDataBlockAuthReqBuffer,
-                    .BufferSize = 5,
-                    .Port = LM_FUOTA_PORT,
-                };
-
                 TransferCompleted = false;
                 TransmitPending = false;
-                LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
+
+                fragComplete.Buffer = FragDataBlockAuthReqBuffer;
+                fragComplete.BufferSize = 5;
+                fragComplete.Port = LM_FUOTA_PORT;
+
+                LmHandlerSend(&fragComplete, LORAMAC_HANDLER_UNCONFIRMED_MSG);
             }
             else
             {
@@ -527,6 +547,7 @@ void application_setup()
     LmFragParams.OnDone = OnFragDone;
     LmFragParams.DecoderCallbacks.FragDecoderWrite = FragDecoderWrite;
     LmFragParams.DecoderCallbacks.FragDecoderRead = FragDecoderRead;
+    LmFragParams.DecoderCallbacks.FragDecoderErase = FragDecoderErase;
 
     LmHandlerErrorStatus_t status = LmHandlerInit(&LmCallbacks, &LmParameters);
     if (status != LORAMAC_HANDLER_SUCCESS)
@@ -543,7 +564,6 @@ void application_setup()
 
     gui32ApplicationTimerPeriod = APPLICATION_TRANSMIT_PERIOD;
 
-    memset(UnfragmentedData, 0, 512);
     FragmentSize = 0;
     FragmentNumber = 0;
     FragmentReceived = 0;
@@ -557,6 +577,7 @@ static char *otaStatusMessage[] =
         "Failure",
         "Pending"
     };
+
 static void
 dump_ota_status(void)
 {
@@ -606,7 +627,7 @@ void application_task(void *pvParameters)
     FreeRTOS_CLIRegisterCommand(&ApplicationCommandDefinition);
     ApplicationTaskQueue = xQueueCreate(10, sizeof(task_message_t));
 
-    am_util_stdio_printf("\r\n\r\nLoRaWAN Application Demo\r\n\r\n");
+    am_util_stdio_printf("\r\n\r\nLoRaWAN Application Demo Original\r\n\r\n");
     nm_console_print_prompt();
 
     dump_ota_status();
