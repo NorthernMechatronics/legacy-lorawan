@@ -526,7 +526,7 @@ void application_setup()
     BoardInitMcu();
     BoardInitPeriph();
 
-    LmParameters.Region = LORAMAC_REGION_US915_HELIUM;
+    LmParameters.Region = LORAMAC_REGION_US915;
     LmParameters.AdrEnable = true;
     LmParameters.TxDatarate = DR_0;
     LmParameters.PublicNetworkEnable = true;
