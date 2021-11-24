@@ -4,7 +4,7 @@
 # Define the locations of the various SDKs and libraries.
 #
 #******************************************************************************
-NM_SDK    := $(shell pwd)/../nmsdk
+NM_SDK    := $(shell pwd)/../nmsdk-helium
 AMBIQ_SDK := $(shell pwd)/../AmbiqSuite-R2.5.1
 FREERTOS  := $(shell pwd)/../FreeRTOS-Kernel
 CORDIO    := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/cordio
