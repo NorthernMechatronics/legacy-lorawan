@@ -29,6 +29,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -47,8 +48,8 @@
 #include <LmHandlerMsgDisplay.h>
 #include <LmhpClockSync.h>
 #include <LmhpCompliance.h>
-#include <LmhpRemoteMcastSetup.h>
 #include <LmhpFragmentation.h>
+#include <LmhpRemoteMcastSetup.h>
 #include <NvmDataMgmt.h>
 #include <board.h>
 #include <timer.h>
@@ -190,7 +191,9 @@ static void OnMacProcess(void)
     // this is called inside an IRQ
     MacProcessing = true;
     timeout = 0;
+#if defined(AM_BSP_GPIO_LED4)
     am_hal_gpio_state_write(AM_BSP_GPIO_LED4, AM_HAL_GPIO_OUTPUT_SET);
+#endif // defined(AM_BSP_GPIO_LED4)
 }
 
 static void OnJoinRequest(LmHandlerJoinParams_t *params)
@@ -311,14 +314,20 @@ static void OnTxData(LmHandlerTxParams_t *params)
     nm_console_print_prompt();
 }
 
-static void OnFragProgress(uint16_t counter, uint16_t blocks, uint8_t size, uint16_t lost)
+static void OnFragProgress(uint16_t counter, uint16_t blocks, uint8_t size,
+                           uint16_t lost)
 {
-    am_util_stdio_printf( "\r\n###### =========== FRAG_DECODER ============ ######\r\n" );
-    am_util_stdio_printf( "######               PROGRESS                ######\r\n");
-    am_util_stdio_printf( "###### ===================================== ######\r\n");
-    am_util_stdio_printf( "RECEIVED    : %5d / %5d Fragments\r\n", counter, blocks );
-    am_util_stdio_printf( "              %5d / %5d Bytes\r\n", counter * size, blocks * size );
-    am_util_stdio_printf( "LOST        :       %7d Fragments\r\n\r\n", lost );
+    am_util_stdio_printf(
+        "\r\n###### =========== FRAG_DECODER ============ ######\r\n");
+    am_util_stdio_printf(
+        "######               PROGRESS                ######\r\n");
+    am_util_stdio_printf(
+        "###### ===================================== ######\r\n");
+    am_util_stdio_printf("RECEIVED    : %5d / %5d Fragments\r\n", counter,
+                         blocks);
+    am_util_stdio_printf("              %5d / %5d Bytes\r\n", counter * size,
+                         blocks * size);
+    am_util_stdio_printf("LOST        :       %7d Fragments\r\n\r\n", lost);
 }
 
 static void OnFragDone(int32_t status, uint32_t size)
@@ -326,21 +335,24 @@ static void OnFragDone(int32_t status, uint32_t size)
     uint32_t rx_crc = Crc32((uint8_t *)OTA_FLASH_ADDRESS, size);
 
     FragDataBlockAuthReqBuffer[0] = 0x05;
-    FragDataBlockAuthReqBuffer[1] =         rx_crc & 0x000000FF;
-    FragDataBlockAuthReqBuffer[2] =  (rx_crc >> 8) & 0x000000FF;
+    FragDataBlockAuthReqBuffer[1] = rx_crc & 0x000000FF;
+    FragDataBlockAuthReqBuffer[2] = (rx_crc >> 8) & 0x000000FF;
     FragDataBlockAuthReqBuffer[3] = (rx_crc >> 16) & 0x000000FF;
     FragDataBlockAuthReqBuffer[4] = (rx_crc >> 24) & 0x000000FF;
 
     TransferCompleted = true;
     TransmitPending = true;
 
-    am_util_stdio_printf( "\r\n");
-    am_util_stdio_printf( "###### =========== FRAG_DECODER ============ ######\r\n" );
-    am_util_stdio_printf( "######               FINISHED                ######\r\n");
-    am_util_stdio_printf( "###### ===================================== ######\r\n");
-    am_util_stdio_printf( "STATUS : %ld\r\n", status );
-    am_util_stdio_printf( "SIZE   : %ld\r\n", size );
-    am_util_stdio_printf( "CRC    : %08lX\n\n", rx_crc );
+    am_util_stdio_printf("\r\n");
+    am_util_stdio_printf(
+        "###### =========== FRAG_DECODER ============ ######\r\n");
+    am_util_stdio_printf(
+        "######               FINISHED                ######\r\n");
+    am_util_stdio_printf(
+        "###### ===================================== ######\r\n");
+    am_util_stdio_printf("STATUS : %ld\r\n", status);
+    am_util_stdio_printf("SIZE   : %ld\r\n", size);
+    am_util_stdio_printf("CRC    : %08lX\n\n", rx_crc);
 }
 
 static int8_t FragDecoderWrite(uint32_t offset, uint8_t *data, uint32_t size)
@@ -350,13 +362,14 @@ static int8_t FragDecoderWrite(uint32_t offset, uint8_t *data, uint32_t size)
     uint32_t source[64];
     uint32_t length = size >> 2;
 
-    am_util_stdio_printf("\r\nDecoder Write: 0x%x, 0x%x, %d\r\n", (uint32_t)destination, (uint32_t)source, length);
+    am_util_stdio_printf("\r\nDecoder Write: 0x%x, 0x%x, %d\r\n",
+                         (uint32_t)destination, (uint32_t)source, length);
     memcpy(source, data, size);
 
     taskENTER_CRITICAL();
 
-    am_hal_flash_program_main(AM_HAL_FLASH_PROGRAM_KEY, source,
-            destination, length);
+    am_hal_flash_program_main(AM_HAL_FLASH_PROGRAM_KEY, source, destination,
+                              length);
 
     taskEXIT_CRITICAL();
 
@@ -379,18 +392,21 @@ static int8_t FragDecoderErase(uint32_t offset, uint32_t size)
     uint32_t totalPage = (size >> 13) + 1;
     uint32_t address = OTA_FLASH_ADDRESS;
 
-    am_util_stdio_printf("\r\nErasing %d pages at 0x%x\r\n", totalPage, address);
+    am_util_stdio_printf("\r\nErasing %d pages at 0x%x\r\n", totalPage,
+                         address);
 
     for (int i = 0; i < totalPage; i++)
     {
         address += AM_HAL_FLASH_PAGE_SIZE;
-        am_util_stdio_printf("Instance: %d, Page: %d\r\n", AM_HAL_FLASH_ADDR2INST(address), AM_HAL_FLASH_ADDR2PAGE(address));
+        am_util_stdio_printf("Instance: %d, Page: %d\r\n",
+                             AM_HAL_FLASH_ADDR2INST(address),
+                             AM_HAL_FLASH_ADDR2PAGE(address));
 
         taskENTER_CRITICAL();
 
         am_hal_flash_page_erase(AM_HAL_FLASH_PROGRAM_KEY,
-                AM_HAL_FLASH_ADDR2INST(address),
-                AM_HAL_FLASH_ADDR2PAGE(address));
+                                AM_HAL_FLASH_ADDR2INST(address),
+                                AM_HAL_FLASH_ADDR2PAGE(address));
 
         taskEXIT_CRITICAL();
     }
@@ -510,7 +526,7 @@ void application_setup()
     BoardInitMcu();
     BoardInitPeriph();
 
-    LmParameters.Region = LORAMAC_REGION_US915;
+    LmParameters.Region = LORAMAC_REGION_US915_HELIUM;
     LmParameters.AdrEnable = true;
     LmParameters.TxDatarate = DR_0;
     LmParameters.PublicNetworkEnable = true;
@@ -568,20 +584,26 @@ void application_setup()
     FragmentNumber = 0;
     FragmentReceived = 0;
     PrepareFlashStorage = 0;
+
+    // MIB Setting for application
+    MibRequestConfirm_t mib;
+    uint16_t channels_mask[] = {0xFF00, 0x0000, 0x0000, 0x0000, 0xFF00};
+
+    JoehackPrintf("Setting up channel mask\r\n");
+    mib.Type = MIB_CHANNELS_MASK;
+    mib.Param.ChannelsMask = channels_mask;
+    LoRaMacMibSetRequestConfirm(&mib);
+    JoehackPrintf("Setting up default channel mask\r\n");
+    mib.Type = MIB_CHANNELS_DEFAULT_MASK;
+    LoRaMacMibSetRequestConfirm(&mib);
 }
 
-static char *otaStatusMessage[] =
-    {
-        "Success",
-        "Error",
-        "Failure",
-        "Pending"
-    };
+static char *otaStatusMessage[] = {"Success", "Error", "Failure", "Pending"};
 
-static void
-dump_ota_status(void)
+static void dump_ota_status(void)
 {
-    uint32_t *pOtaDesc = (uint32_t *)(OTA_POINTER_LOCATION & ~(AM_HAL_FLASH_PAGE_SIZE - 1));
+    uint32_t *pOtaDesc =
+        (uint32_t *)(OTA_POINTER_LOCATION & ~(AM_HAL_FLASH_PAGE_SIZE - 1));
     uint32_t i;
 
     // Check if the current content at OTA descriptor is valid
@@ -592,7 +614,8 @@ dump_ota_status(void)
         {
             break;
         }
-        if (((pOtaDesc[i] & 0x3) == AM_HAL_OTA_STATUS_ERROR) || ((pOtaDesc[i] & ~0x3) >= 0x100000))
+        if (((pOtaDesc[i] & 0x3) == AM_HAL_OTA_STATUS_ERROR) ||
+            ((pOtaDesc[i] & ~0x3) >= 0x100000))
         {
             break;
         }
@@ -604,15 +627,16 @@ dump_ota_status(void)
         // Dump previous OTA information
         am_hal_ota_status_t otaStatus[AM_HAL_SECURE_OTA_MAX_OTA];
         am_hal_get_ota_status(pOtaDesc, AM_HAL_SECURE_OTA_MAX_OTA, otaStatus);
-        for ( uint32_t i = 0; i < AM_HAL_SECURE_OTA_MAX_OTA; i++ )
+        for (uint32_t i = 0; i < AM_HAL_SECURE_OTA_MAX_OTA; i++)
         {
             if ((uint32_t)otaStatus[i].pImage == 0xFFFFFFFF)
             {
                 break;
             }
             {
-                am_util_stdio_printf("\r\nPrevious OTA: Blob Addr: 0x%x - Result %s\r\n",
-                                     otaStatus[i].pImage, otaStatusMessage[otaStatus[i].status]);
+                am_util_stdio_printf(
+                    "\r\nPrevious OTA: Blob Addr: 0x%x - Result %s\r\n",
+                    otaStatus[i].pImage, otaStatusMessage[otaStatus[i].status]);
             }
         }
     }
@@ -651,8 +675,21 @@ void application_task(void *pvParameters)
         }
         else
         {
+#if defined(AM_BSP_GPIO_LED4)
             am_hal_gpio_state_write(AM_BSP_GPIO_LED4, AM_HAL_GPIO_OUTPUT_CLEAR);
+#endif // defined(AM_BSP_GPIO_LED4)
             application_handle_command();
         }
     }
+}
+
+void JoehackPrintf(const char *format, ...)
+{
+    static char buf[256];
+    va_list args;
+    va_start(args, format);
+    vsprintf(buf, format, args);
+    va_end(args);
+
+    am_util_stdio_printf("\r\n%8.3f: %s", TimerGetCurrentTime() / 1000.0, buf);
 }

@@ -2,8 +2,8 @@ ifndef NM_SDK
     $(error NM SDK location NM_SDK not defined)
 endif
 
-INCLUDES += -I$(LORAMAC)/src/mac
-INCLUDES += -I$(LORAMAC)/src/mac/region
+INCLUDES += -I$(NM_SDK)/features/loramac-node/src/mac
+INCLUDES += -I$(NM_SDK)/features/loramac-node/src/mac/region
 INCLUDES += -I$(LORAMAC)/src/boards
 INCLUDES += -I$(LORAMAC)/src/radio
 INCLUDES += -I$(LORAMAC)/src/system
