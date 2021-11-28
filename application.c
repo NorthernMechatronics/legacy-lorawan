@@ -438,11 +438,6 @@ void application_handle_uplink()
             }
             else
             {
-                if (ClockSynchronized == false)
-                {
-                    LmHandlerDeviceTimeReq();
-                }
-
                 TransmitPending = false;
                 LmHandlerSend(&LmAppData, LmMsgType);
             }
