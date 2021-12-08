@@ -168,7 +168,7 @@ static void OnClassChange(DeviceClass_t deviceClass)
     }
 }
 
-static void OnBeaconStatusChange(LoRaMAcHandlerBeaconParams_t *params)
+static void OnBeaconStatusChange(LoRaMacHandlerBeaconParams_t *params)
 {
     DisplayBeaconUpdate(params);
 
@@ -547,7 +547,7 @@ void application_setup()
     LmFragParams.OnDone = OnFragDone;
     LmFragParams.DecoderCallbacks.FragDecoderWrite = FragDecoderWrite;
     LmFragParams.DecoderCallbacks.FragDecoderRead = FragDecoderRead;
-    LmFragParams.DecoderCallbacks.FragDecoderErase = FragDecoderErase;
+    // LmFragParams.DecoderCallbacks.FragDecoderErase = FragDecoderErase;
 
     LmHandlerErrorStatus_t status = LmHandlerInit(&LmCallbacks, &LmParameters);
     if (status != LORAMAC_HANDLER_SUCCESS)
