@@ -65,6 +65,10 @@
 
 #define FRAGMENTATION_DATA_FRAGMENT 0x08
 
+#if !defined(AM_BSP_GPIO_LED4)
+#define AM_BSP_GPIO_LED4 AM_BSP_GPIO_LED0
+#endif // !defined(AM_BSP_GPIO_LED4)
+
 uint32_t gui32ApplicationTimerPeriod;
 static uint32_t gui32Counter;
 
@@ -509,6 +513,15 @@ void application_setup()
 
     BoardInitMcu();
     BoardInitPeriph();
+
+#if defined(AM_BSP_GPIO_LORA_EN)
+    am_hal_gpio_pinconfig(AM_BSP_GPIO_LORA_EN, g_AM_HAL_GPIO_OUTPUT);
+    am_util_delay_us(100);
+    am_hal_gpio_state_write(AM_BSP_GPIO_LORA_EN, AM_HAL_GPIO_OUTPUT_CLEAR);
+    am_util_delay_us(100);
+    am_hal_gpio_state_write(AM_BSP_GPIO_LORA_EN, AM_HAL_GPIO_OUTPUT_SET);
+    am_util_delay_us(100);
+#endif // defined(AM_BSP_GPIO_LORA_EN)
 
     LmParameters.Region = LORAMAC_REGION_US915;
     LmParameters.AdrEnable = true;
