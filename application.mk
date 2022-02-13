@@ -6,10 +6,10 @@
 #******************************************************************************
 NM_SDK    := $(shell pwd)/../nmsdk-helium
 AMBIQ_SDK := $(shell pwd)/../AmbiqSuite-R2.5.1
-FREERTOS  := $(shell pwd)/../FreeRTOS-Kernel
+FREERTOS  := $(shell pwd)/../FreeRTOS-Kernel/FreeRTOS/Source
 CORDIO    := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/cordio
 UECC      := $(shell pwd)/../AmbiqSuite-R2.5.1/third_party/uecc
-LORAMAC   := $(shell pwd)/../LoRaMac-node-NMI
+LORAMAC   := $(shell pwd)/../nmsdk-helium/features/loramac-node
 
 #******************************************************************************
 #
@@ -17,7 +17,7 @@ LORAMAC   := $(shell pwd)/../LoRaMac-node-NMI
 # Specify the location of the board support package to be used.
 #
 #******************************************************************************
-BSP_DIR := $(NM_SDK)/bsp/expLoRaBLE
+BSP_DIR := $(NM_SDK)/bsp/nm180100evb
 
 #******************************************************************************
 #
